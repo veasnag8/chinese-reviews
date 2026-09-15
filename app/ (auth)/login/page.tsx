@@ -1,3 +1,5 @@
+"use client";
+
 import { signInWithPassword } from "@supabase/supabase-js";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";

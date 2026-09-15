@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
@@ -28,7 +30,6 @@ export default function SettingsPage() {
     }
     setUser(data.user.id);
     
-    // Fetch profile
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")

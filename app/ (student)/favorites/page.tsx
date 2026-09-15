@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
@@ -65,17 +67,21 @@ export default function FavoritesPage() {
                         {item.pinyin && <p className="text-sm text-muted-foreground">{item.pinyin}</p>}
                         {item.khmer && <p className="text-sm text-primary">{item.khmer}</p>}
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => {
-                        // Remove from favorites
-                        supabase.from("favorites").delete().eq("id", fav.id);
-                        fetchFavorites();
-                      }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          // Remove from favorites
+                          supabase.from("favorites").delete().eq("id", fav.id);
+                          fetchFavorites();
+                        }}
+                      >
                         ❌
                       </Button>
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })}
             </div>
           )}
         </Card>

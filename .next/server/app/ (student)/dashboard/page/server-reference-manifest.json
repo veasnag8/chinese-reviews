@@ -1,0 +1,16 @@
+{
+  "node": {
+    "7f077291a3e06a186194c20922bab227721918919b": {
+      "workers": {
+        "app/ (student)/dashboard/page": {
+          "moduleId": 247,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "exportedName": "supabase",
+      "filename": "lib/supabase.ts"
+    }
+  },
+  "edge": {}
+}

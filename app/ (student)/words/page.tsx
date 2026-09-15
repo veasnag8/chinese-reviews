@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
@@ -187,7 +189,7 @@ export default function WordsPage() {
                       { value: 5, label: "HSK 5" },
                       { value: 6, label: "HSK 6" },
                     ]}
-                    onValueChange={(val) => setFormState?.({ ...formState, hskLevel: val })}
+                    onValueChange={(val) => {/* set hskLevel */}}
                   />
                 </div>
               </div>
@@ -202,7 +204,7 @@ export default function WordsPage() {
                 <Input placeholder="e.g., noun, verb" {...register("partOfSpeech")} />
               </div>
               
-              <Button type="submit" disabled={formState === "submitting"} disabled={formState === "error"}>
+              <Button type="submit" disabled={formState === "submitting"}>
                 {formState === "submitting" ? "Saving..." : "Save Word"}
               </Button>
               

@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
@@ -81,7 +83,7 @@ export default function DashboardPage() {
     const items = data?.map((cls: any) => ({
       name: cls.name,
       date: formatDate(cls.date),
-      items: 0, // Would need to count words + sentences
+      items: 0,
     })) || [];
     
     setRecentClasses(items);
@@ -103,7 +105,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <!-- Stats Cards -->
+          {/* Stats Cards */}
           <div>
             <Card className="p-6">
               <h3 className="text-lg font-medium mb-4">Today's Review</h3>

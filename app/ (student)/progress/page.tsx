@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
@@ -33,25 +35,21 @@ export default function ProgressPage() {
   const fetchStats = async () => {
     if (!user) return;
     
-    // Get words count
     const { count: wordsCount, error: wordsError } = await supabase
       .from("words")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user);
     
-    // Get sentences count
     const { count: sentencesCount, error: sentencesError } = await supabase
       .from("sentences")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user);
     
-    // Get review sessions
     const { count: sessionsCount, error: sessionsError } = await supabase
       .from("study_sessions")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user);
     
-    // Get average accuracy from review history
     const { data: historyData, error: historyError } = await supabase
       .from("review_history")
       .select("correct")
