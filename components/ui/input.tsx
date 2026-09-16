@@ -13,10 +13,15 @@ const inputVariants = {
 
 export function Input(props: InputProps) {
   const { variant = "default", className, ...propsRest } = props;
-  
+
   return (
     <input
-      className={cn(inputVariants[variant], className)}
+      className={cn(
+        inputVariants[variant],
+        variant === "underlined" &&
+          "border-0 border-b border-slate-200 bg-transparent px-0 py-2.5 text-base text-slate-700 shadow-none transition-all duration-200 placeholder:text-slate-400 focus:border-sky-500 focus:outline-none",
+        className
+      )}
       {...propsRest}
     />
   );

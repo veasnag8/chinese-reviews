@@ -10,12 +10,12 @@ export const metadata = {
 
 export default function Root({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: {
-    [key: string]: string;
-  };
 }) {
-  return <html lang="en">{children}</html>;
+  return (
+    <html lang="en">
+      <body className="bg-background text-foreground">{children}</body>
+    </html>
+  );
 }

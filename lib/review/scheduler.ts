@@ -1,4 +1,4 @@
-import { type ReviewItem, type ReviewSession, type ReviewResult, type SpacedRepetitionConfig } from "./types";
+import { type ReviewItem, type ReviewSession, type ReviewResult, type SpacedRepetitionConfig, DEFAULT_CONFIG } from "./types";
 
 export function calculateNextReview(
   item: ReviewItem,

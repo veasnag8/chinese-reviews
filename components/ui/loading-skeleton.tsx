@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cn } from "@/lib/utils";
 
 export function LoadingSkeleton({
   className,
@@ -9,14 +10,18 @@ export function LoadingSkeleton({
   width?: string;
   height?: string;
 }) {
+  const heightClass =
+    height === "1rem"
+      ? "h-8"
+      : height === "0.5rem"
+        ? "h-4"
+        : "";
+
   return (
     <div
       className={cn(
         "bg-muted/30 rounded-lg animate-pulse",
-        {
-          "h-8": height === "1rem",
-          "h-4": height === "0.5rem",
-        },
+        heightClass,
         width,
         className
       )}
@@ -39,6 +44,13 @@ export function SkeletonAvatar({
   };
 
   return (
-    <div className={cn(sizeMap[size], "rounded-full", "bg-muted/30", className)} />
+    <div
+      className={cn(
+        sizeMap[size],
+        "rounded-full",
+        "bg-muted/30",
+        className
+      )}
+    />
   );
 }
