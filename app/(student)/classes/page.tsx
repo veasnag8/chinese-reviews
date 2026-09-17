@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,7 @@ export default function ClassesPage() {
     const { data, error } = await supabase
       .from("classes")
       .select("*")
+      .order("name", { ascending: true })
       .order("date", { ascending: false });
 
     if (error) {
@@ -99,6 +100,21 @@ export default function ClassesPage() {
     setLoadError("");
     setClasses(classesWithContentCounts);
   };
+
+  const groupedClasses = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    classes.forEach((cls) => {
+      const key = cls.name || "Unnamed Class";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(cls);
+    });
+    return Array.from(groups.entries()).map(([name, lessons]) => ({
+      name,
+      lessons: lessons.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      totalWords: lessons.reduce((sum, l) => sum + (l.word_count || 0), 0),
+      totalSentences: lessons.reduce((sum, l) => sum + (l.sentence_count || 0), 0),
+    }));
+  }, [classes]);
 
   const onAddClass = async (data: ClassFormData) => {
     if (!user) return;
@@ -183,37 +199,46 @@ export default function ClassesPage() {
             </p>
           </EmptyState>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-card">
-                  <th className="p-3 text-left">Class</th>
-                  <th className="p-3 text-left">Date</th>
-                  <th className="p-3 text-left">Words</th>
-                  <th className="p-3 text-left">Sentences</th>
-                  <th className="p-3 text-left">Teacher</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {classes.map((cls: any) => (
-                  <tr
-                    key={cls.id}
-                    className="hover:bg-muted/50"
-                  >
-                    <td className="p-3">{cls.name}</td>
-                    <td className="p-3">{formatDate(cls.date)}</td>
-                    <td className="p-3">{cls.word_count || 0}</td>
-                    <td className="p-3">
-                      {cls.sentence_count || 0}
-                    </td>
-                    <td className="p-3">
-                      {cls.teacher || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-6">
+            {groupedClasses.map((group) => (
+              <details key={group.name} className="group border border-stone-200 rounded-2xl bg-white">
+                <summary className="flex items-center justify-between p-5 cursor-pointer list-none bg-stone-50 rounded-t-2xl">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {group.lessons.length} lesson{group.lessons.length !== 1 ? 's' : ''} •
+                      {group.totalWords} word{group.totalWords !== 1 ? 's' : ''} •
+                      {group.totalSentences} sentence{group.totalSentences !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <span className="text-slate-400">▼</span>
+                </summary>
+                <div className="p-5 space-y-3">
+                  {group.lessons.map((lesson) => (
+                    <div key={lesson.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-full bg-[#b91c1c] text-white text-sm font-semibold px-3 py-1">
+                          {formatDate(lesson.date)}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            Lesson {lesson.lesson_number ? `#${lesson.lesson_number}` : ''}
+                          </p>
+                          {lesson.description && (
+                            <p className="text-xs text-slate-500">{lesson.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-slate-500">
+                        <span>📝 {lesson.word_count || 0} words</span>
+                        <span>📖 {lesson.sentence_count || 0} sentences</span>
+                        {lesson.teacher && <span>👤 {lesson.teacher}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
           </div>
         )}
       </div>

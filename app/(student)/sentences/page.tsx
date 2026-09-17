@@ -1,6 +1,8 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Heart } from "lucide-react";
+import { fetchFavoriteIds, toggleFavorite } from "@/lib/favorites";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -29,6 +31,11 @@ export default function SentencesPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [date, setDate] = useState(todayISO());
+  const [favoriteSentences, setFavoriteSentences] = useState<Set<string>>(new Set());
+  const [favoriteError, setFavoriteError] = useState('');
+  const [favoritesReady, setFavoritesReady] = useState(false);
+  const [pendingFavorites, setPendingFavorites] = useState<Set<string>>(new Set());
+  const pendingFavoriteIds = useRef(new Set<string>());
 
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
@@ -44,7 +51,48 @@ export default function SentencesPage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    setFavoritesReady(false);
+    fetchFavoriteIds(user).then((result) => {
+      if (!active) return;
+      if (result.error) setFavoriteError(result.error);
+      else {
+        setFavoriteSentences(result.sentences);
+        setFavoritesReady(true);
+      }
+    }).catch(() => {
+      if (active) setFavoriteError('Unable to load favorites. Please reload and try again.');
+    });
+    return () => { active = false; };
+  }, [user]);
+
+  const toggleSentenceFavorite = async (id: string) => {
+    if (!user || !favoritesReady || pendingFavoriteIds.current.has(id)) return;
+    const isFavorite = favoriteSentences.has(id);
+    pendingFavoriteIds.current.add(id);
+    setPendingFavorites(new Set(pendingFavoriteIds.current));
+    setFavoriteError('');
+    try {
+      const result = await toggleFavorite(user, 'sentence', id, isFavorite);
+      if (result.error) setFavoriteError(result.error);
+      else setFavoriteSentences((current) => {
+        const next = new Set(current);
+        if (isFavorite) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    } catch {
+      setFavoriteError('Unable to update favorites. Please try again.');
+    } finally {
+      pendingFavoriteIds.current.delete(id);
+      setPendingFavorites(new Set(pendingFavoriteIds.current));
+    }
+  };
+
   const fetchUser = async () => {
+    if (!supabase) return;
     const { data, error } = await supabase.auth.getUser();
 
     if (error || !data.user) {
@@ -152,6 +200,8 @@ export default function SentencesPage() {
           )}
         </div>
 
+        {favoriteError && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{favoriteError}</p>}
+
         {formState === "error" && (
           <div className="mb-4 rounded-md border border-destructive p-3 text-destructive">
             Failed to save sentence. Please try again.
@@ -230,6 +280,16 @@ export default function SentencesPage() {
                     </td>
 
                     <td className="p-3 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={!favoritesReady || pendingFavorites.has(sentence.id)}
+                        onClick={() => void toggleSentenceFavorite(sentence.id)}
+                        aria-pressed={favoriteSentences.has(sentence.id)}
+                        aria-label={`${favoriteSentences.has(sentence.id) ? 'Remove' : 'Save'} sentence ${favoriteSentences.has(sentence.id) ? 'from' : 'to'} favorites`}
+                        className={`rounded-lg p-2 disabled:opacity-50 ${favoriteSentences.has(sentence.id) ? 'text-red-500' : 'text-slate-400'}`}
+                      >
+                        <Heart size={20} fill={favoriteSentences.has(sentence.id) ? 'currentColor' : 'none'} />
+                      </button>
                       {isAdmin ? (
                         <>
                           <Button

@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, Search, Volume2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { fetchFavoriteIds, toggleFavorite } from '@/lib/favorites';
 
 type WordItem = {
   id: string;
@@ -38,6 +39,10 @@ export default function WordsPage() {
   const [words, setWords] = useState<WordItem[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [favoriteError, setFavoriteError] = useState('');
+  const [pendingFavorites, setPendingFavorites] = useState<Set<string>>(new Set());
+  const pendingFavoriteIds = useRef(new Set<string>());
 
   useEffect(() => {
     const loadWords = async () => {
@@ -46,11 +51,22 @@ export default function WordsPage() {
         return;
       }
 
-      const { data } = await supabase
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) {
+        setFavoriteError('Please sign in to save favorites.');
+        setLoading(false);
+        return;
+      }
+      const favoriteIds = await fetchFavoriteIds(auth.user.id);
+      if (favoriteIds.error) setFavoriteError(favoriteIds.error);
+      else setUserId(auth.user.id);
+
+      const { data, error } = await supabase
         .from('words')
         .select('id, chinese, pinyin, khmer, english, hsk_level, classes!words_class_id_fkey (name, date)')
         .order('created_at', { ascending: false });
 
+      if (error) setFavoriteError(error.message);
       setWords(
         ((data || []) as unknown as WordRow[])
           .filter((word) => word.chinese)
@@ -67,7 +83,7 @@ export default function WordsPage() {
                 : word.hsk_level
                   ? `HSK ${word.hsk_level}`
                   : '',
-            favorite: false,
+            favorite: favoriteIds.words.has(word.id),
           }))
       );
       setLoading(false);
@@ -75,6 +91,23 @@ export default function WordsPage() {
 
     loadWords();
   }, []);
+
+  const toggleWordFavorite = async (word: WordItem) => {
+    if (!userId || pendingFavoriteIds.current.has(word.id)) return;
+    pendingFavoriteIds.current.add(word.id);
+    setPendingFavorites(new Set(pendingFavoriteIds.current));
+    setFavoriteError('');
+    try {
+      const result = await toggleFavorite(userId, 'word', word.id, word.favorite);
+      if (result.error) setFavoriteError(result.error);
+      else setWords((current) => current.map((item) => item.id === word.id ? { ...item, favorite: !word.favorite } : item));
+    } catch {
+      setFavoriteError('Unable to update favorites. Please try again.');
+    } finally {
+      pendingFavoriteIds.current.delete(word.id);
+      setPendingFavorites(new Set(pendingFavoriteIds.current));
+    }
+  };
 
   const list = useMemo(
     () =>
@@ -107,6 +140,8 @@ export default function WordsPage() {
         />
       </div>
 
+      {favoriteError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{favoriteError}</p>}
+
       {loading ? (
         <p className="text-slate-500">Loading words...</p>
       ) : (
@@ -126,9 +161,13 @@ export default function WordsPage() {
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
+                    void toggleWordFavorite(w);
                   }}
-                  className={w.favorite ? 'text-red-500' : 'text-slate-300'}
-                  aria-label="Favorite"
+                  type="button"
+                  disabled={!userId || pendingFavorites.has(w.id)}
+                  className={`${w.favorite ? 'text-red-500' : 'text-slate-400'} disabled:opacity-50`}
+                  aria-pressed={w.favorite}
+                  aria-label={`${w.favorite ? 'Remove' : 'Save'} ${w.chinese} ${w.favorite ? 'from' : 'to'} favorites`}
                 >
                   <Heart size={20} fill={w.favorite ? 'currentColor' : 'none'} />
                 </button>
