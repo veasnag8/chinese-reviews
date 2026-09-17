@@ -10,7 +10,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ensureClassForDate, todayISO } from "@/lib/schedule";
+import { todayISO } from "@/lib/schedule";
 
 const wordSchema = z.object({
   chinese: z.string().min(1, "Chinese is required"),
@@ -21,9 +21,8 @@ const wordSchema = z.object({
   exampleSentence: z.string().optional(),
   examplePinyin: z.string().optional(),
   exampleKhmer: z.string().optional(),
-  hskLevel: z.number().optional(),
   category: z.string().optional(),
-  date: z.string().min(1, "Lesson date is required"),
+  classId: z.string().min(1, "Class is required"),
 });
 
 type WordFormData = z.infer<typeof wordSchema>;
@@ -73,6 +72,23 @@ export default function AdminWordsPage() {
     );
   };
 
+  const [classes, setClasses] = useState<any[]>([]);
+
+  const fetchClasses = async () => {
+    const { data, error } = await supabase
+      .from("classes")
+      .select("id, name, date")
+      .order("name", { ascending: true })
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setClasses(data || []);
+  };
+
   const fetchWords = async () => {
     const { data, error } = await supabase
       .from("words")
@@ -90,12 +106,17 @@ export default function AdminWordsPage() {
     setWords(data || []);
   };
 
+  useEffect(() => {
+    if (user) {
+      fetchClasses();
+    }
+  }, [user]);
+
   const [search, setSearch] = useState("");
   const { register, handleSubmit, reset, setValue, watch } = useForm<WordFormData>({
     resolver: zodResolver(wordSchema),
     defaultValues: {
-      date: todayISO(),
-      hskLevel: undefined,
+      classId: "",
     },
   });
 
@@ -118,13 +139,6 @@ export default function AdminWordsPage() {
     setFormState("submitting");
     setErrorMessage("");
 
-    const lesson = await ensureClassForDate(data.date);
-    if (lesson.error) {
-      setErrorMessage(lesson.error);
-      setFormState("error");
-      return;
-    }
-
     const { error } = await supabase
       .from("words")
       .insert({
@@ -136,9 +150,8 @@ export default function AdminWordsPage() {
         example_sentence: data.exampleSentence,
         example_pinyin: data.examplePinyin,
         example_khmer: data.exampleKhmer,
-        hsk_level: data.hskLevel,
         category: data.category,
-        class_id: lesson.id,
+        class_id: data.classId,
         user_id: user,
       } as any);
 
@@ -162,13 +175,6 @@ export default function AdminWordsPage() {
     setFormState("submitting");
     setErrorMessage("");
 
-    const lesson = await ensureClassForDate(data.date);
-    if (lesson.error) {
-      setErrorMessage(lesson.error);
-      setFormState("error");
-      return;
-    }
-
     const { error } = await (supabase.from("words") as any)
       .update({
         chinese: data.chinese,
@@ -179,9 +185,8 @@ export default function AdminWordsPage() {
         example_sentence: data.exampleSentence,
         example_pinyin: data.examplePinyin,
         example_khmer: data.exampleKhmer,
-        hsk_level: data.hskLevel,
         category: data.category,
-        class_id: lesson.id,
+        class_id: data.classId,
         updated_at: new Date().toISOString(),
       })
       .eq("id", editingWord.id);
@@ -314,50 +319,29 @@ export default function AdminWordsPage() {
                     {...register("english")}
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                  Lesson date
-                  </label>
-
-                  <Input
-                    type="date"
-                    {...register("date")}
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Words saved on this date are shared with all students.
-                  </p>
-                </div>
-              </div>
-
-              <div>
+                <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-2">
-                  HSK Level
+                  Class
                 </label>
-
                 <Select
-                  value={
-                    watch("hskLevel") === undefined
-                      ? ""
-                      : String(watch("hskLevel"))
-                  }
+                  value={watch("classId") || ""}
                   options={[
-                    { value: "", label: "Select an HSK level" },
-                    { value: "0", label: "Foundation" },
-                    { value: "1", label: "HSK 1" },
-                    { value: "2", label: "HSK 2" },
-                    { value: "3", label: "HSK 3" },
-                    { value: "4", label: "HSK 4" },
-                    { value: "5", label: "HSK 5" },
-                    { value: "6", label: "HSK 6" },
+                    { value: "", label: "Select a class" },
+                    ...classes.map((cls: any) => ({
+                      value: cls.id,
+                      label: cls.date ? `${cls.date} — ${cls.name}` : cls.name,
+                    })),
                   ]}
                   onChange={(event) => {
                     const value = event.target.value;
-
-                    setValue("hskLevel", value ? Number(value) : undefined);
+                    setValue("classId", value || undefined);
                   }}
                 />
+<p className="mt-1 text-xs text-muted-foreground">
+                  Words are assigned to this class and shared with its students.
+                </p>
               </div>
+            </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">
@@ -458,8 +442,7 @@ export default function AdminWordsPage() {
                     <th className="p-3 text-left">Pinyin</th>
                     <th className="p-3 text-left">Khmer</th>
                     <th className="p-3 text-left">English</th>
-                    <th className="p-3 text-left">Lesson date</th>
-                    <th className="p-3 text-left">HSK</th>
+                    <th className="p-3 text-left">Class</th>
                     <th className="p-3 text-left">Actions</th>
                   </tr>
                 </thead>
@@ -487,17 +470,10 @@ export default function AdminWordsPage() {
                       </td>
 
                       <td className="p-3">
-                        {word.classes?.date ||
+                        {word.classes?.name ||
+                          word.classes?.date ||
                           word.class_name ||
                           "—"}
-                      </td>
-
-                      <td className="p-3">
-                        {word.hsk_level === 0
-                          ? "Foundation"
-                          : word.hsk_level
-                            ? `HSK ${word.hsk_level}`
-                            : "—"}
                       </td>
 
                       <td className="p-3 flex gap-2">
@@ -512,27 +488,22 @@ export default function AdminWordsPage() {
                                 setIsEditing(true);
                                 setFormState("idle");
 
-                                reset({
-                                  chinese: word.chinese || "",
-                                  pinyin: word.pinyin || "",
-                                  khmer: word.khmer || "",
-                                  english: word.english || "",
-                                  partOfSpeech:
-                                    word.part_of_speech || "",
-                                  exampleSentence:
-                                    word.example_sentence || "",
-                                  examplePinyin:
-                                    word.example_pinyin || "",
-                                  exampleKhmer:
-                                    word.example_khmer || "",
-                                  category: word.category || "",
-                                  date:
-                                    word.classes?.date || todayISO(),
-                                  hskLevel:
-                                    word.hsk_level === null || word.hsk_level === undefined
-                                      ? undefined
-                                      : Number(word.hsk_level),
-                                });
+reset({
+                              chinese: word.chinese || "",
+                              pinyin: word.pinyin || "",
+                              khmer: word.khmer || "",
+                              english: word.english || "",
+                              partOfSpeech:
+                                word.part_of_speech || "",
+                              exampleSentence:
+                                word.example_sentence || "",
+                              examplePinyin:
+                                word.example_pinyin || "",
+                              exampleKhmer:
+                                word.example_khmer || "",
+                              category: word.category || "",
+                              classId: word.class_id || "",
+                            });
                               }}
                             >
                               Edit

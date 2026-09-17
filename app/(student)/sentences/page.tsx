@@ -5,12 +5,12 @@ import { Heart } from "lucide-react";
 import { fetchFavoriteIds, toggleFavorite } from "@/lib/favorites";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ensureClassForDate, todayISO } from "@/lib/schedule";
 
 const sentenceSchema = z.object({
   chineseSentence: z.string().min(1, "Sentence is required"),
@@ -18,6 +18,7 @@ const sentenceSchema = z.object({
   khmerTranslation: z.string().optional(),
   englishTranslation: z.string().optional(),
   audioUrl: z.string().optional(),
+  classId: z.string().min(1, "Class is required"),
 });
 
 type SentenceFormData = z.infer<typeof sentenceSchema>;
@@ -27,10 +28,10 @@ export default function SentencesPage() {
 
   const [user, setUser] = useState<string | null>(null);
   const [sentences, setSentences] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [isStaff, setIsStaff] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  const [date, setDate] = useState(todayISO());
   const [favoriteSentences, setFavoriteSentences] = useState<Set<string>>(new Set());
   const [favoriteError, setFavoriteError] = useState('');
   const [favoritesReady, setFavoritesReady] = useState(false);
@@ -40,6 +41,21 @@ export default function SentencesPage() {
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
+
+  const fetchClasses = async () => {
+    const { data, error } = await supabase
+      .from("classes")
+      .select("id, name, date")
+      .order("name", { ascending: true })
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setClasses(data || []);
+  };
 
   useEffect(() => {
     fetchUser();
@@ -110,6 +126,8 @@ export default function SentencesPage() {
     const role = (profile as { role?: string } | null)?.role;
     setIsStaff(role === "admin" || role === "teacher");
     setIsAdmin(role === "admin");
+
+    await fetchClasses();
   };
 
   const fetchSentences = async () => {
@@ -126,7 +144,7 @@ export default function SentencesPage() {
     setSentences(data || []);
   };
 
-  const { register, handleSubmit, reset } = useForm<SentenceFormData>({
+  const { register, handleSubmit, reset, watch, setValue } = useForm<SentenceFormData>({
     resolver: zodResolver(sentenceSchema),
   });
 
@@ -134,13 +152,6 @@ export default function SentencesPage() {
     if (!user) return;
 
     setFormState("submitting");
-
-    const lesson = await ensureClassForDate(date);
-    if (lesson.error) {
-      console.error(lesson.error);
-      setFormState("error");
-      return;
-    }
 
     const { error } = await supabase
       .from("sentences")
@@ -150,7 +161,7 @@ export default function SentencesPage() {
         khmer_translation: data.khmerTranslation,
         english_translation: data.englishTranslation,
         audio_url: data.audioUrl,
-        class_id: lesson.id,
+        class_id: data.classId,
         user_id: user,
       } as any);
 
@@ -213,9 +224,25 @@ export default function SentencesPage() {
             <h3 className="text-lg font-semibold">Add sentence</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-medium">
-                Lesson date
-                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2" />
-                <span className="mt-1 block text-xs text-muted-foreground">Sentences saved on this date are shared with all students.</span>
+                Class
+                <Select
+                  value={watch("classId") || ""}
+                  options={[
+                    { value: "", label: "Select a class" },
+                    ...classes.map((cls: any) => ({
+                      value: cls.id,
+                      label: cls.date ? `${cls.date} — ${cls.name}` : cls.name,
+                    })),
+                  ]}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setValue("classId", value || undefined);
+                  }}
+                  required
+                />
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Sentences are assigned to this class and shared with its students.
+                </span>
               </label>
             </div>
             <textarea {...register("chineseSentence")} required placeholder="Chinese sentence" className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" />
@@ -226,7 +253,7 @@ export default function SentencesPage() {
               <input {...register("audioUrl")} placeholder="Audio URL (optional)" className="rounded-md border border-input bg-background px-3 py-2" />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" disabled={formState === "submitting" || !date}>{formState === "submitting" ? "Saving..." : "Save Sentence"}</Button>
+              <Button type="submit" disabled={formState === "submitting" || !watch("classId")}>{formState === "submitting" ? "Saving..." : "Save Sentence"}</Button>
               <Button type="button" variant="outline" onClick={() => { setIsAdding(false); reset(); }}>Cancel</Button>
             </div>
           </form>
@@ -248,7 +275,7 @@ export default function SentencesPage() {
                   <th className="p-3 text-left">Pinyin</th>
                   <th className="p-3 text-left">Khmer</th>
                   <th className="p-3 text-left">English</th>
-                  <th className="p-3 text-left">Lesson date</th>
+                  <th className="p-3 text-left">Class</th>
                   <th className="p-3 text-left">Actions</th>
                 </tr>
               </thead>
@@ -276,7 +303,10 @@ export default function SentencesPage() {
                     </td>
 
                     <td className="p-3">
-                      {sentence.classes?.date || sentence.class_name || "—"}
+                      {sentence.classes?.name ||
+                        sentence.classes?.date ||
+                        sentence.class_name ||
+                        "—"}
                     </td>
 
                     <td className="p-3 flex gap-2">
