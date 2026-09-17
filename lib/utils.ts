@@ -2,8 +2,14 @@ export function cn(...classes: (string | undefined | null)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string, format?: 'default' | 'dd/MM/yyyy'): string {
   const d = new Date(date);
+  if (format === 'dd/MM/yyyy') {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
   return d.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
