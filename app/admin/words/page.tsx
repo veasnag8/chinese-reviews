@@ -22,7 +22,8 @@ const wordSchema = z.object({
   examplePinyin: z.string().optional(),
   exampleKhmer: z.string().optional(),
   category: z.string().optional(),
-  classId: z.string().min(1, "Class is required"),
+  className: z.string().min(1, "Class is required"),
+  date: z.string().min(1, "Lesson date is required"),
 });
 
 type WordFormData = z.infer<typeof wordSchema>;
@@ -73,6 +74,7 @@ export default function AdminWordsPage() {
   };
 
   const [classes, setClasses] = useState<any[]>([]);
+  const [classNames, setClassNames] = useState<string[]>([]);
 
   const fetchClasses = async () => {
     const { data, error } = await supabase
@@ -87,6 +89,8 @@ export default function AdminWordsPage() {
     }
 
     setClasses(data || []);
+    const uniqueNames = [...new Set(data?.map((c: any) => c.name).filter(Boolean))].sort();
+    setClassNames(uniqueNames);
   };
 
   const fetchWords = async () => {
@@ -116,7 +120,8 @@ export default function AdminWordsPage() {
   const { register, handleSubmit, reset, setValue, watch } = useForm<WordFormData>({
     resolver: zodResolver(wordSchema),
     defaultValues: {
-      classId: "",
+      className: "",
+      date: todayISO(),
     },
   });
 
@@ -133,11 +138,45 @@ export default function AdminWordsPage() {
     );
   }, [search, words]);
 
+  const getOrCreateClass = async (name: string, date: string) => {
+    if (!supabase) return { id: null, error: "Supabase not configured" };
+
+    const { data: existing } = await supabase
+      .from("classes")
+      .select("id")
+      .eq("name", name)
+      .eq("date", date)
+      .maybeSingle();
+
+    if (existing && typeof existing === "object" && "id" in existing) {
+      return { id: (existing as { id: string }).id };
+    }
+
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return { id: null, error: "Not authenticated" };
+
+    const { data: created, error } = await supabase
+      .from("classes")
+      .insert({ name, date, user_id: auth.user.id } as any)
+      .select("id")
+      .single();
+
+    if (error) return { id: null, error: error.message };
+    return { id: (created as { id: string } | null)?.id ?? null };
+  };
+
   const onWordSubmit = async (data: WordFormData) => {
     if (!user) return;
 
     setFormState("submitting");
     setErrorMessage("");
+
+    const classResult = await getOrCreateClass(data.className, data.date);
+    if (classResult.error) {
+      setErrorMessage(classResult.error);
+      setFormState("error");
+      return;
+    }
 
     const { error } = await supabase
       .from("words")
@@ -151,7 +190,7 @@ export default function AdminWordsPage() {
         example_pinyin: data.examplePinyin,
         example_khmer: data.exampleKhmer,
         category: data.category,
-        class_id: data.classId,
+        class_id: classResult.id,
         user_id: user,
       } as any);
 
@@ -169,11 +208,18 @@ export default function AdminWordsPage() {
     await fetchWords();
   };
 
-  const onWordUpdate = async (data: WordFormData) => {
+const onWordUpdate = async (data: WordFormData) => {
     if (!editingWord?.id) return;
 
     setFormState("submitting");
     setErrorMessage("");
+
+    const classResult = await getOrCreateClass(data.className, data.date);
+    if (classResult.error) {
+      setErrorMessage(classResult.error);
+      setFormState("error");
+      return;
+    }
 
     const { error } = await (supabase.from("words") as any)
       .update({
@@ -186,7 +232,7 @@ export default function AdminWordsPage() {
         example_pinyin: data.examplePinyin,
         example_khmer: data.exampleKhmer,
         category: data.category,
-        class_id: data.classId,
+        class_id: classResult.id,
         updated_at: new Date().toISOString(),
       })
       .eq("id", editingWord.id);
@@ -224,7 +270,7 @@ export default function AdminWordsPage() {
     setEditingWord(null);
     setIsEditing(true);
     setFormState("idle");
-    reset();
+    reset({ className: "", date: todayISO() });
   };
 
   if (access === "checking") {
@@ -319,27 +365,35 @@ export default function AdminWordsPage() {
                     {...register("english")}
                   />
                 </div>
+<div className="grid grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
-                <label className="block text-sm font-medium mb-2">
-                  Class
-                </label>
-                <Select
-                  value={watch("classId") || ""}
-                  options={[
-                    { value: "", label: "Select a class" },
-                    ...classes.map((cls: any) => ({
-                      value: cls.id,
-                      label: cls.date ? `${cls.date} — ${cls.name}` : cls.name,
-                    })),
-                  ]}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setValue("classId", value || undefined);
-                  }}
-                />
-<p className="mt-1 text-xs text-muted-foreground">
-                  Words are assigned to this class and shared with its students.
-                </p>
+                  <label className="block text-sm font-medium mb-2">
+                    Class
+                  </label>
+                  <Select
+                    value={watch("className") || ""}
+                    options={[
+                      { value: "", label: "Select a class" },
+                      ...classNames.map((name) => ({ value: name, label: name })),
+                    ]}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setValue("className", value || undefined);
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Lesson Date
+                  </label>
+                  <Input
+                    type="date"
+                    {...register("date")}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Words with this class name and date will be grouped together.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -502,7 +556,8 @@ reset({
                               exampleKhmer:
                                 word.example_khmer || "",
                               category: word.category || "",
-                              classId: word.class_id || "",
+                              className: word.classes?.name || "",
+                              date: word.classes?.date || todayISO(),
                             });
                               }}
                             >
