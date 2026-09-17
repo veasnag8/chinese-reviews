@@ -2,13 +2,19 @@ export function cn(...classes: (string | undefined | null)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function formatDate(date: Date | string, format?: 'default' | 'dd/MM/yyyy'): string {
+export function formatDate(date: Date | string, format?: 'default' | 'dd/MM/yyyy' | 'dd' | 'MMM'): string {
   const d = new Date(date);
   if (format === 'dd/MM/yyyy') {
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
     return `${day}/${month}/${year}`;
+  }
+  if (format === 'dd') {
+    return String(d.getDate()).padStart(2, '0');
+  }
+  if (format === 'MMM') {
+    return d.toLocaleString(undefined, { month: 'short' });
   }
   return d.toLocaleDateString(undefined, {
     year: "numeric",

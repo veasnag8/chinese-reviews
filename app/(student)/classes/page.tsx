@@ -201,8 +201,8 @@ export default function ClassesPage() {
         ) : (
           <div className="space-y-4">
             {groupedClasses.map((group) => (
-              <details key={group.name} className="group bg-white rounded-2xl border border-stone-200">
-                <summary className="flex items-center justify-between p-5 cursor-pointer list-none bg-stone-50 rounded-t-2xl">
+              <div key={group.name} className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+                <div className="px-5 py-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
                     <p className="mt-1 text-sm text-slate-500">
@@ -211,33 +211,45 @@ export default function ClassesPage() {
                       {group.totalSentences} sentence{group.totalSentences !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  <span className="text-slate-400 transition-transform group-open:rotate-180">▼</span>
-                </summary>
-                <div className="p-5 space-y-3">
+                </div>
+                <div className="divide-y divide-stone-100">
                   {group.lessons.map((lesson) => (
-                    <div key={lesson.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-full bg-[#b91c1c] text-white text-sm font-semibold px-3 py-1">
-                          {formatDate(lesson.date, 'dd/MM/yyyy')}
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">
-                            Lesson {lesson.lesson_number ? `#${lesson.lesson_number}` : ''}
+                    <div key={lesson.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-stone-50 transition-colors">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-[#b91c1c] text-white flex-shrink-0">
+                          <span className="font-semibold text-sm leading-tight">
+                            {formatDate(lesson.date, 'dd')}
+                          </span>
+                          <span className="absolute bottom-1 right-1 text-[10px] font-medium opacity-90">
+                            {formatDate(lesson.date, 'MMM').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 truncate">
+                            {lesson.lesson_number ? `Lesson #${lesson.lesson_number}` : 'Lesson'}
                           </p>
-                          {lesson.description && (
-                            <p className="text-xs text-slate-500">{lesson.description}</p>
-                          )}
+                          <p className="text-xs text-slate-500 truncate">
+                            {lesson.description || 'No description'}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-slate-500">
-                        <span>📝 {lesson.word_count || 0} words</span>
-                        <span>📖 {lesson.sentence_count || 0} sentences</span>
-                        {lesson.teacher && <span>👤 {lesson.teacher}</span>}
+                      <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
+                        <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-stone-100">
+                          📝 {lesson.word_count || 0}
+                        </span>
+                        <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-stone-100">
+                          📖 {lesson.sentence_count || 0}
+                        </span>
+                        {lesson.teacher && (
+                          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-stone-100">
+                            👤 {lesson.teacher}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
-              </details>
+              </div>
             ))}
           </div>
         )}
