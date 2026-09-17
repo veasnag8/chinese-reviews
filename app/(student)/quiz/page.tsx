@@ -30,6 +30,8 @@ type WordRow = {
   english?: string | null;
   category?: string | null;
   class_id?: string | null;
+  created_at?: string | null;
+  classes?: { date?: string | null } | null;
 };
 
 export default function QuizPage() {
@@ -51,33 +53,71 @@ export default function QuizPage() {
         setLoading(false);
         return;
       }
-      const [questionsResult, wordsResult] = await Promise.all([
-        supabase.from('quiz_questions').select('id, chinese, correct_answer, options, pinyin, khmer, english, class_id').order('created_at', { ascending: false }),
-        supabase.from('words').select('chinese, pinyin, khmer, english, category, class_id'),
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const dateStr = sevenDaysAgo.toISOString().split('T')[0];
+
+      const [wordsResult] = await Promise.all([
+        supabase
+          .from('words')
+          .select('chinese, pinyin, khmer, english, category, class_id, created_at, classes!words_class_id_fkey (date)')
+          .gte('created_at', dateStr)
+          .order('created_at', { ascending: false }),
       ]);
-      setQuestions((questionsResult.data || []) as QuizQuestion[]);
+
+      const wordRows = ((wordsResult.data || []) as WordRow[])
+        .filter((word) => word.chinese)
+        .map((word) => ({
+          chinese: word.chinese,
+          answer: (word.khmer || word.english || word.pinyin || '').trim(),
+          pinyin: word.pinyin,
+          khmer: word.khmer,
+          english: word.english,
+          category: word.category,
+          class_id: word.class_id,
+        }))
+        .filter((item) => item.answer);
+
+      if (wordRows.length < 2) {
+        setWordPool([]);
+        setLoading(false);
+        return;
+      }
+
+      const shuffled = [...wordRows].sort(() => Math.random() - 0.5).slice(0, 10);
+      const generatedQuestions = shuffled.map((word) => ({
+        id: crypto.randomUUID(),
+        chinese: word.chinese,
+        correct_answer: word.answer,
+        pinyin: word.pinyin,
+        khmer: word.khmer,
+        english: word.english,
+        class_id: word.class_id,
+      }));
+
+      setQuestions(generatedQuestions);
       setWordPool(
-        ((wordsResult.data || []) as WordRow[])
-          .map((word) => ({
-            chinese: word.chinese,
-            answer: meaningFromWord(word),
-            pinyin: word.pinyin,
-            khmer: word.khmer,
-            english: word.english,
-            category: word.category,
-            class_id: word.class_id,
-          }))
-          .filter((item) => item.answer)
+        shuffled.map((word) => ({
+          chinese: word.chinese,
+          answer: word.answer,
+          pinyin: word.pinyin,
+          khmer: word.khmer,
+          english: word.english,
+          category: word.category,
+          class_id: word.class_id,
+        }))
       );
       setLoading(false);
     };
+
     loadQuestions();
   }, []);
 
   const quizQuestions = useMemo(
     () =>
       questions.map((question) => {
-        const target: QuizMeaning = {
+        const target = {
           chinese: question.chinese,
           answer: question.correct_answer,
           pinyin: question.pinyin,
@@ -85,24 +125,17 @@ export default function QuizPage() {
           english: question.english,
           class_id: question.class_id,
         };
-        const fromQuestionBank = questions
-          .filter((item) => item.id !== question.id)
-          .map((item) => ({
-            chinese: item.chinese,
-            answer: item.correct_answer,
-            pinyin: item.pinyin,
-            khmer: item.khmer,
-            english: item.english,
-            class_id: item.class_id,
-          }));
-        const stored = (question.options || []).filter((option) => option.trim() && option.trim() !== question.correct_answer);
-        const similar = pickSimilarDistractors(target, [...fromQuestionBank, ...wordPool], 3);
-        const wrongAnswers = [...new Set([...stored, ...similar])].slice(0, 3);
-        return { ...question, choices: shuffleChoices([question.correct_answer, ...wrongAnswers]) };
+        const similar = pickSimilarDistractors(target, wordPool, 3);
+        return {
+          ...question,
+          choices: shuffleChoices([question.correct_answer, ...similar]),
+        };
       }),
     [questions, wordPool]
   );
+
   const question = quizQuestions[questionIndex];
+
   const restart = () => {
     setQuestionIndex(0);
     setSelectedAnswer('');
@@ -117,6 +150,7 @@ export default function QuizPage() {
     if (!supabase || submitted || submitting) return;
     setSubmitting(true);
     setSubmitError('');
+
     const { data: authData } = await supabase.auth.getUser();
     const user = authData.user;
     if (!user) {
@@ -156,12 +190,14 @@ export default function QuizPage() {
   };
 
   if (loading) return <p className="text-slate-500">Loading quiz...</p>;
+
   if (questions.length < 2)
     return (
       <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-slate-500">
-        Quiz is not ready yet. Your teacher needs to add at least 2 quiz questions.
+        Not enough words from the last 7 days. Add more words to play.
       </div>
     );
+
   if (!question)
     return (
       <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
@@ -203,8 +239,8 @@ export default function QuizPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Student quiz</p>
-          <h1 className="mt-1 text-3xl font-bold">Test your Chinese</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Daily Quiz</p>
+          <h1 className="mt-1 text-3xl font-bold">Test your Chinese (Last 7 Days)</h1>
         </div>
         <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
           {questionIndex + 1} / {quizQuestions.length}
