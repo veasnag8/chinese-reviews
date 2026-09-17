@@ -198,20 +198,21 @@ export default function ClassesPage() {
               Create your first class to organize your words and sentences
             </p>
           </EmptyState>
-        ) : (
+) : (
           <div className="space-y-4">
             {groupedClasses.map((group) => (
-              <div key={group.name} className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-                <div className="px-5 py-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
-                    <p className="mt-1 text-sm text-slate-500">
+              <details key={group.name} className="group bg-white rounded-2xl border border-stone-200 overflow-hidden">
+                <summary className="flex items-center justify-between p-4 bg-stone-50 border-b border-stone-200 cursor-pointer list-none">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-slate-900 truncate">{group.name}</h3>
+                    <p className="mt-1 text-sm text-slate-500 truncate">
                       {group.lessons.length} lesson{group.lessons.length !== 1 ? 's' : ''} •
                       {group.totalWords} word{group.totalWords !== 1 ? 's' : ''} •
                       {group.totalSentences} sentence{group.totalSentences !== 1 ? 's' : ''}
                     </p>
                   </div>
-                </div>
+                  <span className="text-slate-400 transition-transform group-open:rotate-180 flex-shrink-0 ml-4">▼</span>
+                </summary>
                 <div className="divide-y divide-stone-100">
                   {group.lessons.map((lesson) => (
                     <div key={lesson.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-stone-50 transition-colors">
@@ -233,7 +234,7 @@ export default function ClassesPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
+                      <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap flex-shrink-0">
                         <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-stone-100">
                           📝 {lesson.word_count || 0}
                         </span>
@@ -249,7 +250,7 @@ export default function ClassesPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </details>
             ))}
           </div>
         )}
