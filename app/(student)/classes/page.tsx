@@ -201,29 +201,43 @@ export default function ClassesPage() {
         ) : (
           <div className="space-y-4">
             {groupedClasses.map((group) => (
-              <div key={group.name} className="bg-white rounded-2xl border border-stone-200 p-5">
-                <h3 className="text-lg font-semibold text-slate-900 mb-3">{group.name}</h3>
-                <ul className="space-y-2 ml-4 border-l-2 border-stone-200 pl-4">
+              <details key={group.name} className="group bg-white rounded-2xl border border-stone-200">
+                <summary className="flex items-center justify-between p-5 cursor-pointer list-none bg-stone-50 rounded-t-2xl">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">{group.name}</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {group.lessons.length} lesson{group.lessons.length !== 1 ? 's' : ''} •
+                      {group.totalWords} word{group.totalWords !== 1 ? 's' : ''} •
+                      {group.totalSentences} sentence{group.totalSentences !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <span className="text-slate-400 transition-transform group-open:rotate-180">▼</span>
+                </summary>
+                <div className="p-5 space-y-3">
                   {group.lessons.map((lesson) => (
-                    <li key={lesson.id} className="relative pb-2 before:absolute before:left-[-10px] before:top-[6px] before:w-2 before:h-2 before:bg-[#b91c1c] before:rounded-full">
-                      <span className="font-medium text-slate-900">
-                        Lesson {formatDate(lesson.date, 'dd/MM/yyyy')}
-                      </span>
-                      {lesson.lesson_number && (
-                        <span className="ml-2 text-xs text-slate-500">(No. {lesson.lesson_number})</span>
-                      )}
-                      {lesson.description && (
-                        <p className="mt-1 text-xs text-slate-500 ml-6">{lesson.description}</p>
-                      )}
-                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500 ml-6">
+                    <div key={lesson.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-full bg-[#b91c1c] text-white text-sm font-semibold px-3 py-1">
+                          {formatDate(lesson.date, 'dd/MM/yyyy')}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            Lesson {lesson.lesson_number ? `#${lesson.lesson_number}` : ''}
+                          </p>
+                          {lesson.description && (
+                            <p className="text-xs text-slate-500">{lesson.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-slate-500">
                         <span>📝 {lesson.word_count || 0} words</span>
                         <span>📖 {lesson.sentence_count || 0} sentences</span>
                         {lesson.teacher && <span>👤 {lesson.teacher}</span>}
                       </div>
-                    </li>
+                    </div>
                   ))}
-                </ul>
-              </div>
+                </div>
+              </details>
             ))}
           </div>
         )}
