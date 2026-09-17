@@ -12,6 +12,7 @@ type CreateStudentPayload = {
 type ManageStudentPayload = {
   id?: string;
   action?: 'update' | 'disable' | 'enable' | 'delete' | 'reset-password';
+  role?: 'student' | 'teacher' | 'admin';
   email?: string;
   fullName?: string;
   password?: string;
@@ -55,7 +56,7 @@ async function requireAdmin(request: NextRequest) {
     .maybeSingle();
 
   if (profileError || profile?.role !== 'admin') return null;
-  return { adminClient };
+  return { adminClient, userId: authData.user.id };
 }
 
 export async function GET(request: NextRequest) {
@@ -66,11 +67,19 @@ export async function GET(request: NextRequest) {
     const { data, error } = await access.adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    const ids = data.users.map((user) => user.id);
+    const { data: profiles, error: profilesError } = ids.length
+      ? await access.adminClient.from('profiles').select('id, role, full_name').in('id', ids)
+      : { data: [], error: null };
+    if (profilesError) return NextResponse.json({ error: profilesError.message }, { status: 500 });
+    const profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
+
     return NextResponse.json({
       users: data.users.map((user) => ({
         id: user.id,
         email: user.email ?? '',
-        fullName: user.user_metadata?.full_name ?? '',
+        fullName: profilesById.get(user.id)?.full_name ?? user.user_metadata?.full_name ?? '',
+        role: profilesById.get(user.id)?.role ?? 'student',
         createdAt: user.created_at,
         lastSignInAt: user.last_sign_in_at ?? null,
         emailConfirmed: Boolean(user.email_confirmed_at),
@@ -101,7 +110,12 @@ export async function PATCH(request: NextRequest) {
       .eq('id', id)
       .maybeSingle();
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
-    if (targetProfile?.role === 'admin') return NextResponse.json({ error: 'Admin accounts cannot be managed here.' }, { status: 403 });
+    if (!['update', 'disable', 'enable', 'delete', 'reset-password'].includes(action)) {
+      return NextResponse.json({ error: 'Invalid user action.' }, { status: 400 });
+    }
+    if (targetProfile?.role === 'admin' && (action === 'delete' || action === 'disable')) {
+      return NextResponse.json({ error: 'Admin accounts cannot be deleted or disabled here.' }, { status: 403 });
+    }
 
     if (action === 'delete') {
       const { error } = await access.adminClient.auth.admin.deleteUser(id);
@@ -128,6 +142,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    const role = payload.role ?? targetProfile?.role ?? 'student';
+    if (!['student', 'teacher', 'admin'].includes(role)) {
+      return NextResponse.json({ error: 'Invalid role.' }, { status: 400 });
+    }
+    if (id === access.userId && role !== 'admin') {
+      return NextResponse.json({ error: 'You cannot remove your own admin access.' }, { status: 400 });
+    }
     const email = payload.email?.trim().toLowerCase();
     const fullName = payload.fullName?.trim() ?? '';
     if (!email || !email.includes('@')) return NextResponse.json({ error: 'A valid email is required.' }, { status: 400 });
@@ -140,7 +161,7 @@ export async function PATCH(request: NextRequest) {
 
     const { error: profileUpdateError } = await access.adminClient
       .from('profiles')
-      .update({ email, full_name: fullName, updated_at: new Date().toISOString() })
+      .update({ email, full_name: fullName, role, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (profileUpdateError) return NextResponse.json({ error: profileUpdateError.message }, { status: 500 });
 

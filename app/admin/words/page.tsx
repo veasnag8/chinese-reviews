@@ -10,6 +10,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ensureClassForDate, todayISO } from "@/lib/schedule";
 
 const wordSchema = z.object({
   chinese: z.string().min(1, "Chinese is required"),
@@ -22,15 +23,16 @@ const wordSchema = z.object({
   exampleKhmer: z.string().optional(),
   hskLevel: z.number().optional(),
   category: z.string().optional(),
-  classId: z.string().optional(),
+  date: z.string().min(1, "Lesson date is required"),
 });
 
 type WordFormData = z.infer<typeof wordSchema>;
 
 export default function AdminWordsPage() {
   const [user, setUser] = useState<string | null>(null);
+  const [access, setAccess] = useState<"checking" | "allowed" | "denied">("checking");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [words, setWords] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
@@ -45,7 +47,6 @@ export default function AdminWordsPage() {
   useEffect(() => {
     if (user) {
       fetchWords();
-      fetchClasses();
     }
   }, [user]);
 
@@ -53,10 +54,23 @@ export default function AdminWordsPage() {
     const { data, error } = await supabase.auth.getUser();
 
     if (error || !data.user) {
+      setAccess("denied");
       return;
     }
 
     setUser(data.user.id);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    const role = (profile as { role?: string } | null)?.role;
+    setIsAdmin(role === "admin");
+    setAccess(
+      role === "admin" || role === "teacher" ? "allowed" : "denied"
+    );
   };
 
   const fetchWords = async () => {
@@ -64,7 +78,7 @@ export default function AdminWordsPage() {
       .from("words")
       .select(`
         *,
-        classes!words_class_id_fkey (name)
+        classes!words_class_id_fkey (name, date)
       `)
       .order("created_at", { ascending: false });
 
@@ -76,25 +90,11 @@ export default function AdminWordsPage() {
     setWords(data || []);
   };
 
-  const fetchClasses = async () => {
-    const { data, error } = await supabase
-      .from("classes")
-      .select("id, name, date")
-      .order("date", { ascending: false });
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    setClasses(data || []);
-  };
-
   const [search, setSearch] = useState("");
   const { register, handleSubmit, reset, setValue, watch } = useForm<WordFormData>({
     resolver: zodResolver(wordSchema),
     defaultValues: {
-      classId: "",
+      date: todayISO(),
       hskLevel: undefined,
     },
   });
@@ -118,6 +118,13 @@ export default function AdminWordsPage() {
     setFormState("submitting");
     setErrorMessage("");
 
+    const lesson = await ensureClassForDate(data.date);
+    if (lesson.error) {
+      setErrorMessage(lesson.error);
+      setFormState("error");
+      return;
+    }
+
     const { error } = await supabase
       .from("words")
       .insert({
@@ -131,7 +138,7 @@ export default function AdminWordsPage() {
         example_khmer: data.exampleKhmer,
         hsk_level: data.hskLevel,
         category: data.category,
-        class_id: data.classId,
+        class_id: lesson.id,
         user_id: user,
       } as any);
 
@@ -155,6 +162,13 @@ export default function AdminWordsPage() {
     setFormState("submitting");
     setErrorMessage("");
 
+    const lesson = await ensureClassForDate(data.date);
+    if (lesson.error) {
+      setErrorMessage(lesson.error);
+      setFormState("error");
+      return;
+    }
+
     const { error } = await (supabase.from("words") as any)
       .update({
         chinese: data.chinese,
@@ -167,7 +181,7 @@ export default function AdminWordsPage() {
         example_khmer: data.exampleKhmer,
         hsk_level: data.hskLevel,
         category: data.category,
-        class_id: data.classId,
+        class_id: lesson.id,
         updated_at: new Date().toISOString(),
       })
       .eq("id", editingWord.id);
@@ -208,8 +222,19 @@ export default function AdminWordsPage() {
     reset();
   };
 
-  if (!user) {
+  if (access === "checking") {
     return null;
+  }
+
+  if (access === "denied") {
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">
+          Only teachers and admins can manage words. Ask your teacher to add
+          words for your lesson date.
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -295,20 +320,13 @@ export default function AdminWordsPage() {
                   Lesson date
                   </label>
 
-                  <Select
-                    value={watch("classId") || ""}
-                    options={[
-                      { value: "", label: "Select a lesson date" },
-                      ...classes.map((cls: any) => ({
-                        value: cls.id,
-                        label: cls.date ? `${cls.date} — ${cls.name}` : cls.name,
-                      })),
-                    ]}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setValue("classId", value || undefined);
-                    }}
+                  <Input
+                    type="date"
+                    {...register("date")}
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Words saved on this date are shared with all students.
+                  </p>
                 </div>
               </div>
 
@@ -440,7 +458,7 @@ export default function AdminWordsPage() {
                     <th className="p-3 text-left">Pinyin</th>
                     <th className="p-3 text-left">Khmer</th>
                     <th className="p-3 text-left">English</th>
-                    <th className="p-3 text-left">Class</th>
+                    <th className="p-3 text-left">Lesson date</th>
                     <th className="p-3 text-left">HSK</th>
                     <th className="p-3 text-left">Actions</th>
                   </tr>
@@ -469,7 +487,7 @@ export default function AdminWordsPage() {
                       </td>
 
                       <td className="p-3">
-                        {word.classes?.name ||
+                        {word.classes?.date ||
                           word.class_name ||
                           "—"}
                       </td>
@@ -483,51 +501,59 @@ export default function AdminWordsPage() {
                       </td>
 
                       <td className="p-3 flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          type="button"
-                          onClick={() => {
-                            setEditingWord(word);
-                            setIsEditing(true);
-                            setFormState("idle");
+                        {isAdmin ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              type="button"
+                              onClick={() => {
+                                setEditingWord(word);
+                                setIsEditing(true);
+                                setFormState("idle");
 
-                            reset({
-                              chinese: word.chinese || "",
-                              pinyin: word.pinyin || "",
-                              khmer: word.khmer || "",
-                              english: word.english || "",
-                              partOfSpeech:
-                                word.part_of_speech || "",
-                              exampleSentence:
-                                word.example_sentence || "",
-                              examplePinyin:
-                                word.example_pinyin || "",
-                              exampleKhmer:
-                                word.example_khmer || "",
-                              category: word.category || "",
-                              classId:
-                                word.class_id || "",
-                              hskLevel:
-                                word.hsk_level === null || word.hsk_level === undefined
-                                  ? undefined
-                                  : Number(word.hsk_level),
-                            });
-                          }}
-                        >
-                          Edit
-                        </Button>
+                                reset({
+                                  chinese: word.chinese || "",
+                                  pinyin: word.pinyin || "",
+                                  khmer: word.khmer || "",
+                                  english: word.english || "",
+                                  partOfSpeech:
+                                    word.part_of_speech || "",
+                                  exampleSentence:
+                                    word.example_sentence || "",
+                                  examplePinyin:
+                                    word.example_pinyin || "",
+                                  exampleKhmer:
+                                    word.example_khmer || "",
+                                  category: word.category || "",
+                                  date:
+                                    word.classes?.date || todayISO(),
+                                  hskLevel:
+                                    word.hsk_level === null || word.hsk_level === undefined
+                                      ? undefined
+                                      : Number(word.hsk_level),
+                                });
+                              }}
+                            >
+                              Edit
+                            </Button>
 
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          type="button"
-                          onClick={() =>
-                            deleteWord(word.id)
-                          }
-                        >
-                          Delete
-                        </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              type="button"
+                              onClick={() =>
+                                deleteWord(word.id)
+                              }
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Admin only
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

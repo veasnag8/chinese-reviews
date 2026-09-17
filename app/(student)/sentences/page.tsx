@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ensureClassForDate, todayISO } from "@/lib/schedule";
 
 const sentenceSchema = z.object({
   chineseSentence: z.string().min(1, "Sentence is required"),
@@ -25,10 +25,10 @@ export default function SentencesPage() {
 
   const [user, setUser] = useState<string | null>(null);
   const [sentences, setSentences] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [isStaff, setIsStaff] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [date, setDate] = useState(todayISO());
 
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
@@ -40,8 +40,7 @@ export default function SentencesPage() {
 
   useEffect(() => {
     if (user) {
-      fetchSentences(user);
-      fetchClasses(user);
+      fetchSentences();
     }
   }, [user]);
 
@@ -60,14 +59,15 @@ export default function SentencesPage() {
       .select("role")
       .eq("id", data.user.id)
       .maybeSingle();
-    setIsAdmin(profile?.role === "admin");
+    const role = (profile as { role?: string } | null)?.role;
+    setIsStaff(role === "admin" || role === "teacher");
+    setIsAdmin(role === "admin");
   };
 
-  const fetchSentences = async (userId: string) => {
+  const fetchSentences = async () => {
     const { data, error } = await supabase
       .from("sentences")
-      .select("*")
-      .eq("user_id", userId)
+      .select("*, classes!sentences_class_id_fkey (name, date)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -76,20 +76,6 @@ export default function SentencesPage() {
     }
 
     setSentences(data || []);
-  };
-
-  const fetchClasses = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("classes")
-      .select("*")
-      .order("date", { ascending: false });
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    setClasses(data || []);
   };
 
   const { register, handleSubmit, reset } = useForm<SentenceFormData>({
@@ -101,6 +87,13 @@ export default function SentencesPage() {
 
     setFormState("submitting");
 
+    const lesson = await ensureClassForDate(date);
+    if (lesson.error) {
+      console.error(lesson.error);
+      setFormState("error");
+      return;
+    }
+
     const { error } = await supabase
       .from("sentences")
       .insert({
@@ -109,7 +102,7 @@ export default function SentencesPage() {
         khmer_translation: data.khmerTranslation,
         english_translation: data.englishTranslation,
         audio_url: data.audioUrl,
-        class_id: selectedClass,
+        class_id: lesson.id,
         user_id: user,
       } as any);
 
@@ -123,7 +116,7 @@ export default function SentencesPage() {
     reset();
     setIsAdding(false);
 
-    await fetchSentences(user);
+    await fetchSentences();
   };
 
   const deleteSentence = async (sentenceId: string) => {
@@ -137,9 +130,7 @@ export default function SentencesPage() {
       return;
     }
 
-    if (user) {
-      await fetchSentences(user);
-    }
+    await fetchSentences();
   };
 
   if (!user) {
@@ -154,25 +145,11 @@ export default function SentencesPage() {
             My Sentences
           </h2>
 
-          {isAdmin && <div className="flex gap-2">
-              <Select
-              value={selectedClass || ""}
-              options={[
-                { value: "", label: "Select lesson date" },
-                ...classes.map((cls: any) => ({
-                  value: cls.id,
-                  label: cls.date ? `${cls.name} — ${cls.date}` : cls.name,
-                })),
-              ]}
-              onChange={(event) =>
-                setSelectedClass(event.target.value || null)
-              }
-              />
-
+          {isStaff && (
             <Button variant="primary" type="button" onClick={() => setIsAdding(true)}>
               + Add Sentence
             </Button>
-          </div>}
+          )}
         </div>
 
         {formState === "error" && (
@@ -181,10 +158,16 @@ export default function SentencesPage() {
           </div>
         )}
 
-        {isAdmin && isAdding && (
+        {isStaff && isAdding && (
           <form onSubmit={handleSubmit(onAddSentence)} className="mb-6 space-y-4 rounded-xl border border-border bg-card p-4">
             <h3 className="text-lg font-semibold">Add sentence</h3>
-            <p className="text-sm text-muted-foreground">Choose the lesson date above before saving this sentence.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">
+                Lesson date
+                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2" />
+                <span className="mt-1 block text-xs text-muted-foreground">Sentences saved on this date are shared with all students.</span>
+              </label>
+            </div>
             <textarea {...register("chineseSentence")} required placeholder="Chinese sentence" className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" />
             <div className="grid gap-3 sm:grid-cols-2">
               <input {...register("pinyin")} placeholder="Pinyin" className="rounded-md border border-input bg-background px-3 py-2" />
@@ -193,7 +176,7 @@ export default function SentencesPage() {
               <input {...register("audioUrl")} placeholder="Audio URL (optional)" className="rounded-md border border-input bg-background px-3 py-2" />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" disabled={formState === "submitting" || !selectedClass}>{formState === "submitting" ? "Saving..." : "Save Sentence"}</Button>
+              <Button type="submit" disabled={formState === "submitting" || !date}>{formState === "submitting" ? "Saving..." : "Save Sentence"}</Button>
               <Button type="button" variant="outline" onClick={() => { setIsAdding(false); reset(); }}>Cancel</Button>
             </div>
           </form>
@@ -215,7 +198,7 @@ export default function SentencesPage() {
                   <th className="p-3 text-left">Pinyin</th>
                   <th className="p-3 text-left">Khmer</th>
                   <th className="p-3 text-left">English</th>
-                  <th className="p-3 text-left">Class</th>
+                  <th className="p-3 text-left">Lesson date</th>
                   <th className="p-3 text-left">Actions</th>
                 </tr>
               </thead>
@@ -243,28 +226,36 @@ export default function SentencesPage() {
                     </td>
 
                     <td className="p-3">
-                      {sentence.class_name || "—"}
+                      {sentence.classes?.date || sentence.class_name || "—"}
                     </td>
 
                     <td className="p-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        type="button"
-                      >
-                        Edit
-                      </Button>
+                      {isAdmin ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            type="button"
+                          >
+                            Edit
+                          </Button>
 
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        type="button"
-                        onClick={() =>
-                          deleteSentence(sentence.id)
-                        }
-                      >
-                        Delete
-                      </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            type="button"
+                            onClick={() =>
+                              deleteSentence(sentence.id)
+                            }
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Admin only
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

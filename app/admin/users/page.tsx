@@ -8,6 +8,7 @@ type AdminUser = {
   id: string;
   email: string;
   fullName: string;
+  role: 'student' | 'teacher' | 'admin';
   createdAt: string;
   lastSignInAt: string | null;
   emailConfirmed: boolean;
@@ -89,6 +90,7 @@ export default function AdminUsersPage() {
         action,
         email: editingUser?.id === user.id ? editingUser.email : user.email,
         fullName: editingUser?.id === user.id ? editingUser.fullName : user.fullName,
+        role: action === 'update' ? user.role : undefined,
       }),
     });
     const result = await response.json();
@@ -126,7 +128,7 @@ export default function AdminUsersPage() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Administration</p>
           <h1 className="mt-1 text-3xl font-bold">Users List</h1>
-          <p className="mt-2 text-slate-500">Create student accounts without asking students to register.</p>
+          <p className="mt-2 text-slate-500">Create student accounts and update student or admin profiles and passwords.</p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={loadUsers} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
@@ -157,10 +159,10 @@ export default function AdminUsersPage() {
 
       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
         <table className="w-full min-w-[680px] text-left text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-slate-600"><tr><th className="p-4">Student</th><th className="p-4">Email</th><th className="p-4">Created</th><th className="p-4">Last sign-in</th><th className="p-4">Status</th><th className="p-4">Actions</th></tr></thead>
+          <thead className="border-b border-stone-200 bg-stone-50 text-slate-600"><tr><th className="p-4">User</th><th className="p-4">Email</th><th className="p-4">Role</th><th className="p-4">Created</th><th className="p-4">Last sign-in</th><th className="p-4">Status</th><th className="p-4">Actions</th></tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={6} className="p-8 text-center text-slate-500">Loading users...</td></tr> : users.map((user) => <tr key={user.id} className="border-b border-stone-100 last:border-0"><td className="p-4 font-semibold">{user.fullName || 'Unnamed student'}</td><td className="p-4 text-slate-600">{user.email}</td><td className="p-4 text-slate-600">{new Date(user.createdAt).toLocaleDateString()}</td><td className="p-4 text-slate-600">{user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'Never'}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${user.disabled ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{user.disabled ? 'Disabled' : user.emailConfirmed ? 'Active' : 'Pending'}</span></td><td className="p-4"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setEditingUser(user)} className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold"><Edit3 size={13} /> Edit</button><button type="button" onClick={() => { setResetUser(user); setNewPassword(''); }} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-2.5 py-1.5 text-xs font-semibold text-sky-700"><KeyRound size={13} /> Reset</button><button type="button" disabled={busy} onClick={() => manageUser(user, user.disabled ? 'enable' : 'disable')} className="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-700">{user.disabled ? 'Enable' : 'Disable'}</button><button type="button" disabled={busy} onClick={() => manageUser(user, 'delete')} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700">Delete</button></div></td></tr>)}
-            {!loading && users.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No users found.</td></tr>}
+            {loading ? <tr><td colSpan={7} className="p-8 text-center text-slate-500">Loading users...</td></tr> : users.map((user) => <tr key={user.id} className="border-b border-stone-100 last:border-0"><td className="p-4 font-semibold">{user.fullName || 'Unnamed student'}</td><td className="p-4 text-slate-600">{user.email}</td><td className="p-4 capitalize text-slate-600">{user.role}</td><td className="p-4 text-slate-600">{new Date(user.createdAt).toLocaleDateString()}</td><td className="p-4 text-slate-600">{user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'Never'}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${user.disabled ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{user.disabled ? 'Disabled' : user.emailConfirmed ? 'Active' : 'Pending'}</span></td><td className="p-4"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setEditingUser(user)} className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold"><Edit3 size={13} /> Edit</button><button type="button" onClick={() => { setResetUser(user); setNewPassword(''); }} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 px-2.5 py-1.5 text-xs font-semibold text-sky-700"><KeyRound size={13} /> Reset</button><button type="button" disabled={busy || (user.role === 'admin' && !user.disabled)} onClick={() => manageUser(user, user.disabled ? 'enable' : 'disable')} className="rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-700">{user.disabled ? 'Enable' : 'Disable'}</button><button type="button" disabled={busy || user.role === 'admin'} onClick={() => manageUser(user, 'delete')} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700">Delete</button></div></td></tr>)}
+            {!loading && users.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-slate-500">No users found.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -168,9 +170,10 @@ export default function AdminUsersPage() {
       {editingUser && (
         <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/30 p-4">
           <form onSubmit={(event) => { event.preventDefault(); manageUser(editingUser, 'update'); }} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-bold">Edit student</h2>
+            <h2 className="text-lg font-bold">Edit user</h2>
             <label className="mt-4 block text-sm font-semibold">Full name<input value={editingUser.fullName} onChange={(event) => setEditingUser({ ...editingUser, fullName: event.target.value })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal" /></label>
             <label className="mt-4 block text-sm font-semibold">Email<input required type="email" value={editingUser.email} onChange={(event) => setEditingUser({ ...editingUser, email: event.target.value })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal" /></label>
+            <label className="mt-4 block text-sm font-semibold">Role<select value={editingUser.role} onChange={(event) => setEditingUser({ ...editingUser, role: event.target.value as AdminUser['role'] })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select></label>
             <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setEditingUser(null)} className="rounded-lg px-4 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-lg bg-[#b91c1c] px-4 py-2 text-sm font-semibold text-white">Save changes</button></div>
           </form>
         </div>
@@ -179,7 +182,7 @@ export default function AdminUsersPage() {
       {resetUser && (
         <div className="fixed inset-0 z-20 grid place-items-center bg-slate-950/30 p-4">
           <form onSubmit={resetPassword} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-bold">Reset student password</h2>
+            <h2 className="text-lg font-bold">Reset password</h2>
             <p className="mt-1 text-sm text-slate-500">Set a new password for {resetUser.email}.</p>
             <label className="mt-4 block text-sm font-semibold">New password<input required minLength={6} type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal" /></label>
             <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setResetUser(null)} className="rounded-lg px-4 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white">Reset password</button></div>

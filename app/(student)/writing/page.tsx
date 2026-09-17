@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import HanziWriter from 'hanzi-writer';
 import { Check, ChevronRight, Eye, EyeOff, RotateCcw, Volume2 } from 'lucide-react';
-import { initialWords } from '@/lib/demo-data';
+import { initialWords, type StudyWord } from '@/lib/demo-data';
+import { supabase } from '@/lib/supabase';
 
 const speak = (text: string) => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -15,10 +16,12 @@ const speak = (text: string) => {
   window.speechSynthesis.speak(utterance);
 };
 
-export default function WritingPage() {
+function WritingPage() {
   const searchParams = useSearchParams();
+  const wordParam = searchParams.get('word');
   const writerElementRef = useRef<HTMLDivElement>(null);
   const writerRef = useRef<HanziWriter | null>(null);
+  const [words, setWords] = useState<StudyWord[]>(initialWords);
   const [wordIndex, setWordIndex] = useState(() =>
     Math.max(0, initialWords.findIndex((word) => word.id === searchParams.get('word')))
   );
@@ -31,8 +34,45 @@ export default function WritingPage() {
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [complete, setComplete] = useState(false);
 
-  const word = initialWords[wordIndex];
+  const word = words[wordIndex] ?? words[0] ?? initialWords[0];
   const character = [...word.chinese][0];
+
+  useEffect(() => {
+    const loadWords = async () => {
+      if (!supabase) return;
+
+      const { data } = await supabase
+        .from('words')
+        .select('id, chinese, pinyin, khmer, english, hsk_level, classes!words_class_id_fkey (name, date)')
+        .order('created_at', { ascending: false });
+
+      const mapped = ((data || []) as any[])
+        .filter((item) => item.chinese)
+        .map((item) => ({
+          id: item.id,
+          chinese: item.chinese,
+          pinyin: item.pinyin || '—',
+          khmer: item.khmer || '—',
+          english: item.english || '—',
+          className: item.classes?.name || item.classes?.date || '',
+          hsk:
+            item.hsk_level === 0
+              ? 'Foundation'
+              : item.hsk_level
+                ? `HSK ${item.hsk_level}`
+                : '',
+        }));
+
+      if (mapped.length === 0) return;
+
+      setWords(mapped);
+      const requested = wordParam;
+      const index = requested ? mapped.findIndex((item) => item.id === requested) : 0;
+      setWordIndex(index >= 0 ? index : 0);
+    };
+
+    loadWords();
+  }, [wordParam]);
 
   useEffect(() => {
     const element = writerElementRef.current;
@@ -54,8 +94,8 @@ export default function WritingPage() {
     });
 
     const writer = HanziWriter.create(element, character, {
-      width: '100%',
-      height: '100%',
+      width: '100%' as unknown as number,
+      height: '100%' as unknown as number,
       padding: 22,
       showOutline: true,
       showCharacter: true,
@@ -123,7 +163,7 @@ export default function WritingPage() {
     setShowCorrectPopup(false);
   };
 
-  const next = () => setWordIndex((index) => (index + 1) % initialWords.length);
+  const next = () => setWordIndex((index) => (index + 1) % words.length);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
@@ -236,5 +276,13 @@ export default function WritingPage() {
         <span className="text-sm font-semibold text-sky-700">{complete ? 'Great work!' : 'Keep tracing'}</span>
       </div>
     </div>
+  );
+}
+
+export default function WritingPageWrapper() {
+  return (
+    <Suspense fallback={<p className="p-6 text-slate-500">Loading practice board...</p>}>
+      <WritingPage />
+    </Suspense>
   );
 }

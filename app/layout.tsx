@@ -1,4 +1,5 @@
 import "./globals.css";
+import { QuizNotificationToaster } from "@/components/quiz-notification-toaster";
 
 export const metadata = {
   title: "Chinese Review",
@@ -16,7 +17,10 @@ export default function Root({
 }) {
   return (
     <html lang="en">
-      <body className="bg-background text-foreground">{children}</body>
+      <body className="bg-background text-foreground">
+        {children}
+        <QuizNotificationToaster />
+      </body>
     </html>
   );
 }

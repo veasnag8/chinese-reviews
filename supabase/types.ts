@@ -12,7 +12,13 @@ type Tables =
   | "favorites"
   | "study_sessions"
   | "quiz_questions"
-  | "quiz_attempts";
+  | "quiz_attempts"
+  | "quiz_notifications"
+  | "quizzes"
+  | "quiz_items"
+  | "quiz_options"
+  | "quiz_submissions"
+  | "quiz_submission_answers";
 
 export interface Database {
   public: {
@@ -378,6 +384,16 @@ export interface Database {
         };
         Update: {
           id?: string;
+          question_type?: "chinese-to-meaning" | "meaning-to-chinese" | "pinyin" | "listening" | "sentence" | "translation";
+          chinese?: string;
+          pinyin?: string | null;
+          khmer?: string | null;
+          english?: string | null;
+          correct_answer?: string;
+          options?: string[];
+          class_id?: string | null;
+          user_id?: string;
+          created_at?: string;
         };
       };
       quiz_attempts: {
@@ -404,6 +420,248 @@ export interface Database {
         Update: {
           id?: string;
         };
+      };
+      quiz_notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          display_name: string | null;
+          type: string;
+          message: string;
+          title: string | null;
+          quiz_id: string | null;
+          link: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          display_name?: string | null;
+          type?: string;
+          message: string;
+          title?: string | null;
+          quiz_id?: string | null;
+          link?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+        };
+      };
+      quizzes: {
+        Row: {
+          id: string;
+          title: string;
+          description: string | null;
+          category: string | null;
+          hsk_level: number | null;
+          status: "draft" | "active" | "inactive" | "expired" | "archived";
+          start_at: string | null;
+          deadline: string | null;
+          user_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          description?: string | null;
+          category?: string | null;
+          hsk_level?: number | null;
+          status?: "draft" | "active" | "inactive" | "expired" | "archived";
+          start_at?: string | null;
+          deadline?: string | null;
+          user_id: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          description?: string | null;
+          category?: string | null;
+          hsk_level?: number | null;
+          status?: "draft" | "active" | "inactive" | "expired" | "archived";
+          start_at?: string | null;
+          deadline?: string | null;
+          user_id?: string;
+          updated_at?: string;
+        };
+      };
+      quiz_items: {
+        Row: {
+          id: string;
+          quiz_id: string;
+          question: string;
+          question_type: "single" | "multiple" | "true-false";
+          explanation: string | null;
+          hint: string | null;
+          word_id: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          quiz_id: string;
+          question: string;
+          question_type?: "single" | "multiple" | "true-false";
+          explanation?: string | null;
+          hint?: string | null;
+          word_id?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          quiz_id?: string;
+          question?: string;
+          question_type?: "single" | "multiple" | "true-false";
+          explanation?: string | null;
+          hint?: string | null;
+          word_id?: string | null;
+          sort_order?: number;
+          updated_at?: string;
+        };
+      };
+      quiz_options: {
+        Row: {
+          id: string;
+          question_id: string;
+          option_text: string;
+          is_correct: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_id: string;
+          option_text: string;
+          is_correct?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_id?: string;
+          option_text?: string;
+          is_correct?: boolean;
+          sort_order?: number;
+        };
+      };
+      quiz_submissions: {
+        Row: {
+          id: string;
+          quiz_id: string;
+          user_id: string;
+          started_at: string | null;
+          submitted_at: string | null;
+          score: number;
+          total_questions: number;
+          correct_answers: number;
+          wrong_answers: number;
+          percentage: number;
+          status: "in_progress" | "submitted" | "expired";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          quiz_id: string;
+          user_id: string;
+          started_at?: string | null;
+          submitted_at?: string | null;
+          score?: number;
+          total_questions?: number;
+          correct_answers?: number;
+          wrong_answers?: number;
+          percentage?: number;
+          status?: "in_progress" | "submitted" | "expired";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          submitted_at?: string | null;
+          score?: number;
+          total_questions?: number;
+          correct_answers?: number;
+          wrong_answers?: number;
+          percentage?: number;
+          status?: "in_progress" | "submitted" | "expired";
+          updated_at?: string;
+        };
+      };
+      quiz_submission_answers: {
+        Row: {
+          id: string;
+          attempt_id: string;
+          question_id: string;
+          selected_option_id: string | null;
+          correct_option_id: string | null;
+          is_correct: boolean;
+          answered_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          attempt_id: string;
+          question_id: string;
+          selected_option_id?: string | null;
+          correct_option_id?: string | null;
+          is_correct?: boolean;
+          answered_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          selected_option_id?: string | null;
+          correct_option_id?: string | null;
+          is_correct?: boolean;
+          answered_at?: string | null;
+        };
+      };
+    };
+    Views: {
+      [key: string]: {
+        Row: Record<string, unknown>;
+        Insert: Record<string, unknown>;
+        Update: Record<string, unknown>;
+      };
+    };
+    Functions: {
+      save_quiz: {
+        Args: {
+          p_quiz_id: string | null;
+          p_title: string;
+          p_description: string | null;
+          p_category: string | null;
+          p_hsk_level: number | null;
+          p_status: string | null;
+          p_start_at: string | null;
+          p_deadline: string | null;
+          p_questions: unknown[];
+        };
+        Returns: string;
+      };
+      get_student_quiz: {
+        Args: { p_quiz_id: string };
+        Returns: any;
+      };
+      start_quiz_attempt: {
+        Args: { p_quiz_id: string };
+        Returns: any;
+      };
+      submit_quiz_attempt: {
+        Args: { p_quiz_id: string; p_answers: unknown[] };
+        Returns: any;
+      };
+      get_student_result: {
+        Args: { p_quiz_id: string };
+        Returns: any;
+      };
+      has_quiz_attempt: {
+        Args: { p_quiz_id: string };
+        Returns: boolean;
       };
     };
     Enums: {

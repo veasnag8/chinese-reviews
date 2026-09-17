@@ -14,6 +14,11 @@ export const supabase =
           persistSession: true,
           detectSessionInUrl: true,
         },
+        realtime: {
+          params: {
+            eventsPerSecond: 10,
+          },
+        },
       })
     : null;
 
