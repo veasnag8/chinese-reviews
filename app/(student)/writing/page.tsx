@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import HanziWriter from 'hanzi-writer';
-import { Check, ChevronRight, Eye, EyeOff, Play, RotateCcw, Volume2 } from 'lucide-react';
+import { Check, ChevronRight, Eye, EyeOff, RotateCcw, Volume2 } from 'lucide-react';
 import { initialWords } from '@/lib/demo-data';
 
 const speak = (text: string) => {
@@ -28,8 +28,6 @@ export default function WritingPage() {
   const [strokePaths, setStrokePaths] = useState<string[]>([]);
   const [boardSize, setBoardSize] = useState(0);
   const [showCorrectPopup, setShowCorrectPopup] = useState(false);
-  const [playingOrder, setPlayingOrder] = useState(false);
-  const [playingStroke, setPlayingStroke] = useState(0);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [complete, setComplete] = useState(false);
 
@@ -46,8 +44,6 @@ export default function WritingPage() {
     setStrokePaths([]);
     setComplete(false);
     setShowCorrectPopup(false);
-    setPlayingOrder(false);
-    setPlayingStroke(0);
 
     let cancelled = false;
     HanziWriter.loadCharacterData(character).then((data) => {
@@ -125,27 +121,6 @@ export default function WritingPage() {
     setStrokeCount(0);
     setComplete(false);
     setShowCorrectPopup(false);
-    setPlayingOrder(false);
-    setPlayingStroke(0);
-  };
-
-  const playOrder = async () => {
-    const writer = writerRef.current;
-    if (!writer || strokePaths.length === 0 || playingOrder) return;
-
-    setPlayingOrder(true);
-    setComplete(false);
-    setStrokeCount(0);
-    writer.cancelQuiz();
-
-    for (let index = 0; index < strokePaths.length; index += 1) {
-      setPlayingStroke(index + 1);
-      await writer.animateStroke(index);
-    }
-
-    setPlayingStroke(0);
-    setPlayingOrder(false);
-    writer.quiz();
   };
 
   const next = () => setWordIndex((index) => (index + 1) % initialWords.length);
@@ -177,7 +152,7 @@ export default function WritingPage() {
       <div className="mt-4 flex flex-wrap gap-2">
         {Array.from({ length: totalStrokes || strokePaths.length || 1 }, (_, index) => index + 1).map((step) => {
           const done = step <= strokeCount;
-          const active = playingOrder ? step === playingStroke : step === strokeCount + 1 && !complete;
+          const active = step === strokeCount + 1 && !complete;
           return (
             <span
               key={step}
@@ -233,14 +208,6 @@ export default function WritingPage() {
           className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
         >
           <RotateCcw size={16} /> Replay
-        </button>
-        <button
-          type="button"
-          onClick={playOrder}
-          disabled={playingOrder || strokePaths.length === 0}
-          className="inline-flex items-center gap-2 rounded-lg border border-sky-700 bg-sky-600 px-4 py-2 text-sm font-bold text-white shadow-[0_4px_12px_rgba(2,132,199,0.3)] transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
-        >
-          <Play size={16} /> {playingOrder ? `Stroke ${playingStroke}` : 'Play order'}
         </button>
         <button
           type="button"

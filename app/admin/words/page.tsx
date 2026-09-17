@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,15 +34,20 @@ export default function AdminWordsPage() {
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingWord, setEditingWord] = useState<any | null>(null);
-  const [hskLevel, setHskLevel] = useState<number | undefined>();
 
   useEffect(() => {
     fetchUser();
-    fetchWords();
-    fetchClasses();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchWords();
+      fetchClasses();
+    }
+  }, [user]);
 
   const fetchUser = async () => {
     const { data, error } = await supabase.auth.getUser();
@@ -74,7 +79,7 @@ export default function AdminWordsPage() {
   const fetchClasses = async () => {
     const { data, error } = await supabase
       .from("classes")
-      .select("id, name")
+      .select("id, name, date")
       .order("date", { ascending: false });
 
     if (error) {
@@ -85,14 +90,33 @@ export default function AdminWordsPage() {
     setClasses(data || []);
   };
 
-  const { register, handleSubmit, reset } = useForm<WordFormData>({
+  const [search, setSearch] = useState("");
+  const { register, handleSubmit, reset, setValue, watch } = useForm<WordFormData>({
     resolver: zodResolver(wordSchema),
+    defaultValues: {
+      classId: "",
+      hskLevel: undefined,
+    },
   });
+
+  const filteredWords = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return words;
+
+    return words.filter((word: any) =>
+      [word.chinese, word.pinyin, word.khmer, word.english, word.category]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [search, words]);
 
   const onWordSubmit = async (data: WordFormData) => {
     if (!user) return;
 
     setFormState("submitting");
+    setErrorMessage("");
 
     const { error } = await supabase
       .from("words")
@@ -105,21 +129,21 @@ export default function AdminWordsPage() {
         example_sentence: data.exampleSentence,
         example_pinyin: data.examplePinyin,
         example_khmer: data.exampleKhmer,
-        hsk_level: hskLevel,
+        hsk_level: data.hskLevel,
         category: data.category,
         class_id: data.classId,
         user_id: user,
       } as any);
 
     if (error) {
-      console.error(error);
+      console.error("Word update failed", error);
+      setErrorMessage(error.message || JSON.stringify(error));
       setFormState("error");
       return;
     }
 
     setFormState("success");
     reset();
-    setHskLevel(undefined);
     setEditingWord(null);
 
     await fetchWords();
@@ -129,6 +153,7 @@ export default function AdminWordsPage() {
     if (!editingWord?.id) return;
 
     setFormState("submitting");
+    setErrorMessage("");
 
     const { error } = await (supabase.from("words") as any)
       .update({
@@ -140,7 +165,7 @@ export default function AdminWordsPage() {
         example_sentence: data.exampleSentence,
         example_pinyin: data.examplePinyin,
         example_khmer: data.exampleKhmer,
-        hsk_level: hskLevel,
+        hsk_level: data.hskLevel,
         category: data.category,
         class_id: data.classId,
         updated_at: new Date().toISOString(),
@@ -149,6 +174,7 @@ export default function AdminWordsPage() {
 
     if (error) {
       console.error(error);
+      setErrorMessage(error.message);
       setFormState("error");
       return;
     }
@@ -157,7 +183,6 @@ export default function AdminWordsPage() {
     setIsEditing(false);
     setEditingWord(null);
     reset();
-    setHskLevel(undefined);
 
     await fetchWords();
   };
@@ -181,7 +206,6 @@ export default function AdminWordsPage() {
     setIsEditing(true);
     setFormState("idle");
     reset();
-    setHskLevel(undefined);
   };
 
   if (!user) {
@@ -268,22 +292,21 @@ export default function AdminWordsPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Class
+                  Lesson date
                   </label>
 
                   <Select
-                    options={classes.map((cls: any) => ({
-                      value: cls.id,
-                      label: cls.name,
-                    }))}
+                    value={watch("classId") || ""}
+                    options={[
+                      { value: "", label: "Select a lesson date" },
+                      ...classes.map((cls: any) => ({
+                        value: cls.id,
+                        label: cls.date ? `${cls.date} — ${cls.name}` : cls.name,
+                      })),
+                    ]}
                     onChange={(event) => {
                       const value = event.target.value;
-
-                      if (value) {
-                        reset({
-                          classId: value,
-                        } as any);
-                      }
+                      setValue("classId", value || undefined);
                     }}
                   />
                 </div>
@@ -295,7 +318,14 @@ export default function AdminWordsPage() {
                 </label>
 
                 <Select
+                  value={
+                    watch("hskLevel") === undefined
+                      ? ""
+                      : String(watch("hskLevel"))
+                  }
                   options={[
+                    { value: "", label: "Select an HSK level" },
+                    { value: "0", label: "Foundation" },
                     { value: "1", label: "HSK 1" },
                     { value: "2", label: "HSK 2" },
                     { value: "3", label: "HSK 3" },
@@ -306,9 +336,7 @@ export default function AdminWordsPage() {
                   onChange={(event) => {
                     const value = event.target.value;
 
-                    setHskLevel(
-                      value ? Number(value) : undefined
-                    );
+                    setValue("hskLevel", value ? Number(value) : undefined);
                   }}
                 />
               </div>
@@ -354,7 +382,6 @@ export default function AdminWordsPage() {
                     setIsEditing(false);
                     setEditingWord(null);
                     reset();
-                    setHskLevel(undefined);
                   }}
                 >
                   Cancel
@@ -368,8 +395,8 @@ export default function AdminWordsPage() {
               )}
 
               {formState === "error" && (
-                <p className="text-sm text-destructive mt-2">
-                  Failed to save word. Please try again.
+                <p className="mt-2 text-sm text-destructive">
+                  Failed to save word: {errorMessage || "Please try again."}
                 </p>
               )}
             </form>
@@ -377,12 +404,32 @@ export default function AdminWordsPage() {
         )}
 
         <div className="mt-6">
+          <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h3 className="text-xl font-semibold text-foreground">Words List</h3>
+              <p className="text-sm text-muted-foreground">
+                {filteredWords.length} of {words.length} words
+              </p>
+            </div>
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search Chinese, Pinyin, Khmer, or English"
+              className="sm:max-w-sm"
+            />
+          </div>
+
           {words.length === 0 ? (
             <EmptyState>
               <p>No words yet</p>
               <p className="text-sm mt-2">
                 Words will appear here once added
               </p>
+            </EmptyState>
+          ) : filteredWords.length === 0 ? (
+            <EmptyState>
+              <p>No matching words</p>
+              <p className="text-sm mt-2">Try another search term.</p>
             </EmptyState>
           ) : (
             <div className="overflow-x-auto">
@@ -400,7 +447,7 @@ export default function AdminWordsPage() {
                 </thead>
 
                 <tbody>
-                  {words.map((word: any) => (
+                  {filteredWords.map((word: any) => (
                     <tr
                       key={word.id}
                       className="hover:bg-muted/50"
@@ -428,7 +475,11 @@ export default function AdminWordsPage() {
                       </td>
 
                       <td className="p-3">
-                        {word.hsk_level || "—"}
+                        {word.hsk_level === 0
+                          ? "Foundation"
+                          : word.hsk_level
+                            ? `HSK ${word.hsk_level}`
+                            : "—"}
                       </td>
 
                       <td className="p-3 flex gap-2">
@@ -457,13 +508,11 @@ export default function AdminWordsPage() {
                               category: word.category || "",
                               classId:
                                 word.class_id || "",
+                              hskLevel:
+                                word.hsk_level === null || word.hsk_level === undefined
+                                  ? undefined
+                                  : Number(word.hsk_level),
                             });
-
-                            setHskLevel(
-                              word.hsk_level
-                                ? Number(word.hsk_level)
-                                : undefined
-                            );
                           }}
                         >
                           Edit

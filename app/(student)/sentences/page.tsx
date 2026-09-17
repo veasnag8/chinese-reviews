@@ -27,6 +27,8 @@ export default function SentencesPage() {
   const [sentences, setSentences] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
@@ -52,6 +54,13 @@ export default function SentencesPage() {
     }
 
     setUser(data.user.id);
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    setIsAdmin(profile?.role === "admin");
   };
 
   const fetchSentences = async (userId: string) => {
@@ -73,7 +82,6 @@ export default function SentencesPage() {
     const { data, error } = await supabase
       .from("classes")
       .select("*")
-      .eq("user_id", userId)
       .order("date", { ascending: false });
 
     if (error) {
@@ -84,7 +92,7 @@ export default function SentencesPage() {
     setClasses(data || []);
   };
 
-  const { reset } = useForm<SentenceFormData>({
+  const { register, handleSubmit, reset } = useForm<SentenceFormData>({
     resolver: zodResolver(sentenceSchema),
   });
 
@@ -113,6 +121,7 @@ export default function SentencesPage() {
 
     setFormState("success");
     reset();
+    setIsAdding(false);
 
     await fetchSentences(user);
   };
@@ -145,27 +154,49 @@ export default function SentencesPage() {
             My Sentences
           </h2>
 
-          <div className="flex gap-2">
-            <Select
-              options={classes.map((cls: any) => ({
-                value: cls.id,
-                label: cls.name,
-              }))}
+          {isAdmin && <div className="flex gap-2">
+              <Select
+              value={selectedClass || ""}
+              options={[
+                { value: "", label: "Select lesson date" },
+                ...classes.map((cls: any) => ({
+                  value: cls.id,
+                  label: cls.date ? `${cls.name} — ${cls.date}` : cls.name,
+                })),
+              ]}
               onChange={(event) =>
                 setSelectedClass(event.target.value || null)
               }
-            />
+              />
 
-            <Button variant="primary" type="button">
+            <Button variant="primary" type="button" onClick={() => setIsAdding(true)}>
               + Add Sentence
             </Button>
-          </div>
+          </div>}
         </div>
 
         {formState === "error" && (
           <div className="mb-4 rounded-md border border-destructive p-3 text-destructive">
             Failed to save sentence. Please try again.
           </div>
+        )}
+
+        {isAdmin && isAdding && (
+          <form onSubmit={handleSubmit(onAddSentence)} className="mb-6 space-y-4 rounded-xl border border-border bg-card p-4">
+            <h3 className="text-lg font-semibold">Add sentence</h3>
+            <p className="text-sm text-muted-foreground">Choose the lesson date above before saving this sentence.</p>
+            <textarea {...register("chineseSentence")} required placeholder="Chinese sentence" className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input {...register("pinyin")} placeholder="Pinyin" className="rounded-md border border-input bg-background px-3 py-2" />
+              <input {...register("khmerTranslation")} placeholder="Khmer translation" className="rounded-md border border-input bg-background px-3 py-2" />
+              <input {...register("englishTranslation")} placeholder="English translation" className="rounded-md border border-input bg-background px-3 py-2" />
+              <input {...register("audioUrl")} placeholder="Audio URL (optional)" className="rounded-md border border-input bg-background px-3 py-2" />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={formState === "submitting" || !selectedClass}>{formState === "submitting" ? "Saving..." : "Save Sentence"}</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsAdding(false); reset(); }}>Cancel</Button>
+            </div>
+          </form>
         )}
 
         {sentences.length === 0 ? (

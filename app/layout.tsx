@@ -4,7 +4,8 @@ export const metadata = {
   title: "Chinese Review",
   description: "Chinese Class Review Web Application",
   icons: {
-    favicon: "/favicon.ico",
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
   },
 };
 

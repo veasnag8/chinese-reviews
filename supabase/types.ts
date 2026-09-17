@@ -25,6 +25,7 @@ export interface Database {
           native_language?: string;
           target_language?: string;
           avatar_url?: string;
+          role?: "student" | "teacher" | "admin";
           created_at: string;
           updated_at: string;
         };
@@ -35,6 +36,7 @@ export interface Database {
           native_language?: string;
           target_language?: string;
           avatar_url?: string;
+          role?: "student" | "teacher" | "admin";
           created_at?: string;
           updated_at?: string;
         };
@@ -45,6 +47,7 @@ export interface Database {
           native_language?: string;
           target_language?: string;
           avatar_url?: string;
+          role?: "student" | "teacher" | "admin";
           updated_at?: string;
         };
       };
@@ -94,7 +97,10 @@ export interface Database {
           category?: string;
           image_url?: string;
           audio_url?: string;
-          class_id: string;
+          writing_character?: string;
+          audio_provider?: string;
+          audio_voice?: string;
+          class_id?: string;
           user_id: string;
           created_at: string;
         };
@@ -112,7 +118,10 @@ export interface Database {
           category?: string;
           image_url?: string;
           audio_url?: string;
-          class_id: string;
+          writing_character?: string;
+          audio_provider?: string;
+          audio_voice?: string;
+          class_id?: string;
           user_id: string;
           created_at?: string;
         };
@@ -130,6 +139,9 @@ export interface Database {
           category?: string;
           image_url?: string;
           audio_url?: string;
+          writing_character?: string;
+          audio_provider?: string;
+          audio_voice?: string;
           class_id?: string;
           updated_at?: string;
         };
@@ -142,7 +154,9 @@ export interface Database {
           khmer_translation?: string;
           english_translation?: string;
           audio_url?: string;
-          class_id: string;
+          audio_provider?: string;
+          audio_voice?: string;
+          class_id?: string;
           user_id: string;
           created_at: string;
         };
@@ -153,7 +167,9 @@ export interface Database {
           khmer_translation?: string;
           english_translation?: string;
           audio_url?: string;
-          class_id: string;
+          audio_provider?: string;
+          audio_voice?: string;
+          class_id?: string;
           user_id: string;
           created_at?: string;
         };
@@ -164,6 +180,8 @@ export interface Database {
           khmer_translation?: string;
           english_translation?: string;
           audio_url?: string;
+          audio_provider?: string;
+          audio_voice?: string;
           updated_at?: string;
         };
       };

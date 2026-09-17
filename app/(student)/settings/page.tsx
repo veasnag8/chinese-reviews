@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
+import { LogOut } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
 
   const [user, setUser] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [nativeLanguage, setNativeLanguage] = useState("Chinese");
   const [targetLanguage, setTargetLanguage] = useState("Chinese");
@@ -33,15 +35,17 @@ export default function SettingsPage() {
 
     const userId = data.user.id;
     setUser(userId);
+    setEmail(data.user.email || "");
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
 
     if (profileError) {
-      console.error(profileError);
+      setIsLoading(false);
+      return;
     }
 
     if (profile) {
@@ -60,6 +64,19 @@ export default function SettingsPage() {
         typedProfile.target_language || "Chinese"
       );
       setAvatarUrl(typedProfile.avatar_url || "");
+    } else {
+      const { error: createProfileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          email: data.user.email || "",
+          full_name: data.user.user_metadata?.full_name || "",
+        } as any);
+
+      if (createProfileError) {
+        setIsLoading(false);
+        return;
+      }
     }
 
     setIsLoading(false);
@@ -78,6 +95,7 @@ export default function SettingsPage() {
       .from("profiles")
       .upsert({
         id: user,
+        email,
         full_name: fullName,
         native_language: nativeLanguage,
         target_language: targetLanguage,
@@ -97,6 +115,11 @@ export default function SettingsPage() {
     setTimeout(() => {
       setSuccess(false);
     }, 3000);
+  };
+
+  const logout = async () => {
+    await supabase?.auth.signOut();
+    router.push("/login");
   };
 
   if (!user) {
@@ -190,6 +213,14 @@ export default function SettingsPage() {
               {isLoading ? "Saving..." : "Update Profile"}
             </Button>
           </form>
+
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+          >
+            <LogOut size={17} /> Log out
+          </button>
         </Card>
       </div>
     </div>

@@ -47,6 +47,11 @@ export default function ClassesPage() {
   }, [user]);
 
   const fetchUser = async () => {
+    if (!supabase) {
+      setLoadError("Supabase is not configured. Add the public keys to .env.local.");
+      return;
+    }
+
     const { data, error } = await supabase.auth.getUser();
 
     if (error || !data.user) {
@@ -58,25 +63,49 @@ export default function ClassesPage() {
   };
 
   const fetchClassesData = async (userId: string) => {
+    if (!supabase) return;
+
     const { data, error } = await supabase
       .from("classes")
       .select("*")
-      .eq("user_id", userId)
       .order("date", { ascending: false });
 
     if (error) {
-      setLoadError(
-        "Your database classes table is not ready yet. Run the Supabase migration, then refresh this page."
-      );
+      setLoadError(`Unable to load classes: ${error.message}`);
       return;
     }
 
+    const classesWithContentCounts = await Promise.all(
+      (data || []).map(async (lessonClass: any) => {
+        const [wordsResult, sentencesResult] = await Promise.all([
+          supabase
+            .from("words")
+            .select("id", { count: "exact", head: true })
+            .eq("class_id", lessonClass.id),
+          supabase
+            .from("sentences")
+            .select("id", { count: "exact", head: true })
+            .eq("class_id", lessonClass.id),
+        ]);
+
+        return {
+          ...lessonClass,
+          word_count: wordsResult.count || 0,
+          sentence_count: sentencesResult.count || 0,
+        };
+      })
+    );
+
     setLoadError("");
-    setClasses(data || []);
+    setClasses(classesWithContentCounts);
   };
 
   const onAddClass = async (data: ClassFormData) => {
     if (!user) return;
+    if (!supabase) {
+      setLoadError("Supabase is not configured. Add the public keys to .env.local.");
+      return;
+    }
 
     setFormState("submitting");
 
@@ -93,6 +122,7 @@ export default function ClassesPage() {
 
     if (error) {
       console.error(error);
+      setLoadError(`Unable to create class: ${error.message}`);
       setFormState("error");
       return;
     }
@@ -131,16 +161,6 @@ export default function ClassesPage() {
           <h2 className="text-2xl font-bold text-foreground">
             My Classes
           </h2>
-
-          <Button
-            variant="primary"
-            onClick={() => {
-              setFormState("idle");
-              setShowCreateForm(true);
-            }}
-          >
-            + Create Class
-          </Button>
         </div>
 
         {formState === "error" && (
@@ -153,71 +173,6 @@ export default function ClassesPage() {
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             {loadError}
           </div>
-        )}
-
-        {showCreateForm && (
-          <Card className="max-w-md p-6">
-            <h3 className="text-lg font-medium mb-4">
-              Create New Class
-            </h3>
-
-            <form
-              onSubmit={handleSubmit(onAddClass)}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Class Name
-                </label>
-                <Input
-                  placeholder="e.g., Class 01"
-                  {...register("name")}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Teacher (optional)
-                </label>
-                <Input
-                  placeholder="Teacher name"
-                  {...register("teacher")}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Lesson Number (optional)
-                </label>
-                <Input
-                  type="number"
-                  placeholder="Lesson number"
-                  {...register("lessonNumber", {
-                    valueAsNumber: true,
-                  })}
-                />
-              </div>
-
-              <Button
-                type="submit"
-                disabled={formState === "submitting"}
-              >
-                {formState === "submitting" ? "Creating..." : "Save Class"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={formState === "submitting"}
-                onClick={() => {
-                  reset();
-                  setFormState("idle");
-                  setShowCreateForm(false);
-                }}
-              >
-                Cancel
-              </Button>
-            </form>
-          </Card>
         )}
 
         {classes.length === 0 ? (
@@ -237,7 +192,6 @@ export default function ClassesPage() {
                   <th className="p-3 text-left">Words</th>
                   <th className="p-3 text-left">Sentences</th>
                   <th className="p-3 text-left">Teacher</th>
-                  <th className="p-3 text-left">Actions</th>
                 </tr>
               </thead>
 
@@ -255,19 +209,6 @@ export default function ClassesPage() {
                     </td>
                     <td className="p-3">
                       {cls.teacher || "—"}
-                    </td>
-                    <td className="p-3 flex gap-2">
-                      <Button size="sm" variant="outline">
-                        Edit
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteClass(cls.id)}
-                      >
-                        Delete
-                      </Button>
                     </td>
                   </tr>
                 ))}
