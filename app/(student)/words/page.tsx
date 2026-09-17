@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Filter } from 'lucide-react';
 import { Heart, Search, Volume2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { fetchFavoriteIds, toggleFavorite } from '@/lib/favorites';
@@ -38,6 +39,7 @@ const speak = (text: string) => {
 export default function WordsPage() {
   const [words, setWords] = useState<WordItem[]>([]);
   const [q, setQ] = useState('');
+  const [classFilter, setClassFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [favoriteError, setFavoriteError] = useState('');
@@ -109,15 +111,28 @@ export default function WordsPage() {
     }
   };
 
+  const classesList = useMemo(
+    () =>
+      Array.from(
+        new Set(words.map((w) => w.className).filter(Boolean))
+      ).sort(),
+    [words]
+  );
+
   const list = useMemo(
     () =>
-      words.filter((w) =>
-        Object.values(w)
-          .join(' ')
-          .toLowerCase()
-          .includes(q.toLowerCase())
-      ),
-    [words, q]
+      words
+        .filter((w) => {
+          const matchesSearch = Object.values(w)
+            .join(' ')
+            .toLowerCase()
+            .includes(q.toLowerCase());
+          const matchesClass =
+            classFilter === 'all' || w.className === classFilter;
+          return matchesSearch && matchesClass;
+        })
+        .sort((a, b) => a.className.localeCompare(b.className)),
+    [words, q, classFilter]
   );
 
   return (
@@ -130,14 +145,31 @@ export default function WordsPage() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 text-slate-400" size={19} />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search Chinese, Pinyin, Khmer, or English"
-          className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-[#b91c1c]"
-        />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 text-slate-400" size={19} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search Chinese, Pinyin, Khmer, or English"
+            className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-[#b91c1c]"
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Class</label>
+          <select
+            value={classFilter}
+            onChange={(e) => setClassFilter(e.target.value)}
+            className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-3 pr-10 outline-none focus:ring-2 focus:ring-[#b91c1c] appearance-none"
+          >
+            <option value="all">All Classes</option>
+            {classesList.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {favoriteError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{favoriteError}</p>}
@@ -177,10 +209,7 @@ export default function WordsPage() {
                 <p className="mt-1 text-sm text-slate-500">{w.english || 'Translation not added'}</p>
               </div>
               <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-                <span>
-                  {w.className}
-                  {w.hsk ? ` · ${w.hsk}` : ''}
-                </span>
+                <span>{w.className}</span>
                 <button
                   onClick={(event) => {
                     event.preventDefault();
