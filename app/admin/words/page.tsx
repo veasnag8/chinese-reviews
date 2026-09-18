@@ -13,6 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
 import { todayISO } from "@/lib/schedule";
 import { parseCSV, parseExcel, mapWordRow, type WordImportRow } from '@/lib/import';
+import { useToasts } from '@/components/ui/toast';
 
 const wordSchema = z.object({
   chinese: z.string().min(1, "Chinese is required"),
@@ -50,6 +51,9 @@ export default function AdminWordsPage() {
   const [importErrors, setImportErrors] = useState<{ row: number; error: string }[]>([]);
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Toast notifications
+  const { push: toast } = useToasts();
 
   useEffect(() => {
     fetchUser();
@@ -314,16 +318,21 @@ const onWordUpdate = async (data: WordFormData) => {
         }
       });
       if (validRows.length === 0) { 
-        setImportError(errors.length > 0 ? `All ${errors.length} rows failed. First error: ${errors[0].error}` : 'No valid words found. Check column names.');
+        const errMsg = errors.length > 0 ? `All ${errors.length} rows failed. First error: ${errors[0].error}` : 'No valid words found. Check column names.';
+        setImportError(errMsg);
         setImportErrors(errors);
+        toast({ title: 'Import Failed', message: errMsg });
         return; 
       }
       setImportHeaders(headers);
       setImportPreview(validRows);
       setImportErrors(errors);
       setShowImportDialog(true);
+      toast({ title: 'File Ready', message: `${validRows.length} valid words found. Review and click Import.` });
     } catch (e: any) {
-      setImportError(e.message || 'Failed to parse file');
+      const errMsg = e.message || 'Failed to parse file';
+      setImportError(errMsg);
+      toast({ title: 'Error', message: errMsg });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -355,7 +364,9 @@ const onWordUpdate = async (data: WordFormData) => {
         }
         if (insertErrors.length > 0) {
           setImportErrors(insertErrors);
-          setImportError(`${insertErrors.length} of ${inserts.length} rows failed. See details below.`);
+          const errMsg = `${insertErrors.length} of ${inserts.length} rows failed. See details below.`;
+          setImportError(errMsg);
+          toast({ title: 'Partial Import', message: errMsg });
         } else {
           throw error;
         }
@@ -365,9 +376,12 @@ const onWordUpdate = async (data: WordFormData) => {
         setImportHeaders([]);
         setImportErrors([]);
         await fetchWords();
+        toast({ title: 'Success', message: `Imported ${importPreview.length} words!` });
       }
     } catch (e: any) {
-      setImportError(e.message || 'Import failed');
+      const errMsg = e.message || 'Import failed';
+      setImportError(errMsg);
+      toast({ title: 'Import Failed', message: errMsg });
     } finally {
       setImporting(false);
     }
@@ -395,8 +409,98 @@ const onWordUpdate = async (data: WordFormData) => {
     );
   }
 
+  // Import Preview Dialog (renders as modal overlay)
+  if (showImportDialog) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between border-b p-4">
+            <h3 className="text-lg font-semibold">Import Preview — {importPreview.length} words</h3>
+            <button onClick={() => setShowImportDialog(false)} className="p-2 hover:bg-muted rounded-lg"><X size={20} /></button>
+          </div>
+          {importError && (
+            <div className="border-b border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
+              <AlertCircle size={16} /> {importError}
+            </div>
+          )}
+          {importErrors.length > 0 && (
+            <div className="border-b border-amber-200 bg-amber-50 p-3">
+              <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
+                <AlertCircle size={16} /> {importErrors.length} row error(s) — fix in Excel and re-import
+              </div>
+              <div className="max-h-40 overflow-auto text-sm">
+                {importErrors.slice(0, 20).map((e, i) => (
+                  <div key={i} className="text-amber-800 font-mono">Row {e.row}: {e.error}</div>
+                ))}
+                {importErrors.length > 20 && <div className="text-amber-600">... and {importErrors.length - 20} more</div>}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 overflow-auto p-4">
+            {importPreview.length > 0 && (
+              <Table>
+                <thead>
+                  <tr className="border-b text-left text-sm text-muted-foreground">
+                    <th className="p-2">#</th>
+                    <th className="p-2">Chinese</th>
+                    <th className="p-2">Pinyin</th>
+                    <th className="p-2">Khmer</th>
+                    <th className="p-2">English</th>
+                    <th className="p-2">HSK</th>
+                    <th className="p-2">Class ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.slice(0, 100).map((row, i) => (
+                    <tr key={i} className="border-b hover:bg-muted/50">
+                      <td className="p-2 text-sm">{i + 1}</td>
+                      <td className="p-2 text-lg font-bold">{row.chinese}</td>
+                      <td className="p-2 text-sm">{row.pinyin || '—'}</td>
+                      <td className="p-2 text-sm">{row.khmer || '—'}</td>
+                      <td className="p-2 text-sm">{row.english || '—'}</td>
+                      <td className="p-2 text-sm">{row.hsk_level ? `HSK ${row.hsk_level}` : '—'}</td>
+                      <td className="p-2 text-sm">{row.class_id || '—'}</td>
+                    </tr>
+                  ))}
+                  {importPreview.length > 100 && (
+                    <tr>
+                      <td colSpan={7} className="p-2 text-center text-muted-foreground">
+                        ... and {importPreview.length - 100} more rows
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            )}
+          </div>
+          <div className="border-t p-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowImportDialog(false)} disabled={importing}>
+              Cancel
+            </Button>
+            <Button onClick={confirmImport} disabled={importing}>
+              {importing ? (<><Loader2 size={16} className="animate-spin mr-2" /> Importing...</>) : (`Import ${importPreview.length} Words`)}
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4">
+      <div className="pointer-events-none fixed right-4 top-20 z-50">
+        <div className="flex flex-col gap-2">
+          {importError && (
+            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/95 p-4 shadow-lg">
+              <AlertCircle className="mt-0.5 size-8 shrink-0 text-red-600" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-red-800">Import Error</p>
+                <p className="mt-0.5 text-xs text-red-700">{importError}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
           <h2 className="text-2xl font-bold text-foreground">
@@ -710,85 +814,9 @@ reset({
               </table>
             </div>
           )}
-</div>
+
+        </div>
       </div>
     </div>
   );
-
-  // Import Preview Dialog
-  if (showImportDialog) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between border-b p-4">
-            <h3 className="text-lg font-semibold">Import Preview — {importPreview.length} words</h3>
-            <button onClick={() => setShowImportDialog(false)} className="p-2 hover:bg-muted rounded-lg"><X size={20} /></button>
-          </div>
-          {importError && (
-            <div className="border-b border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
-              <AlertCircle size={16} /> {importError}
-            </div>
-          )}
-          {importErrors.length > 0 && (
-            <div className="border-b border-amber-200 bg-amber-50 p-3">
-              <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
-                <AlertCircle size={16} /> {importErrors.length} row error(s) — fix in Excel and re-import
-              </div>
-              <div className="max-h-40 overflow-auto text-sm">
-                {importErrors.slice(0, 20).map((e, i) => (
-                  <div key={i} className="text-amber-800 font-mono">Row {e.row}: {e.error}</div>
-                ))}
-                {importErrors.length > 20 && <div className="text-amber-600">... and {importErrors.length - 20} more</div>}
-              </div>
-            </div>
-          )}
-          <div className="flex-1 overflow-auto p-4">
-            {importPreview.length > 0 && (
-              <Table>
-                <thead>
-                  <tr className="border-b text-left text-sm text-muted-foreground">
-                    <th className="p-2">#</th>
-                    <th className="p-2">Chinese</th>
-                    <th className="p-2">Pinyin</th>
-                    <th className="p-2">Khmer</th>
-                    <th className="p-2">English</th>
-                    <th className="p-2">HSK</th>
-                    <th className="p-2">Class ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {importPreview.slice(0, 100).map((row, i) => (
-                    <tr key={i} className="border-b hover:bg-muted/50">
-                      <td className="p-2 text-sm">{i + 1}</td>
-                      <td className="p-2 text-lg font-bold">{row.chinese}</td>
-                      <td className="p-2 text-sm">{row.pinyin || '—'}</td>
-                      <td className="p-2 text-sm">{row.khmer || '—'}</td>
-                      <td className="p-2 text-sm">{row.english || '—'}</td>
-                      <td className="p-2 text-sm">{row.hsk_level ? `HSK ${row.hsk_level}` : '—'}</td>
-                      <td className="p-2 text-sm">{row.class_id || '—'}</td>
-                    </tr>
-                  ))}
-                  {importPreview.length > 100 && (
-                    <tr>
-                      <td colSpan={7} className="p-2 text-center text-muted-foreground">
-                        ... and {importPreview.length - 100} more rows
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </Table>
-            )}
-          </div>
-          <div className="border-t p-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowImportDialog(false)} disabled={importing}>
-              Cancel
-            </Button>
-            <Button onClick={confirmImport} disabled={importing}>
-              {importing ? (<><Loader2 size={16} className="animate-spin mr-2" /> Importing...</>) : (`Import ${importPreview.length} Words`)}
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 }
