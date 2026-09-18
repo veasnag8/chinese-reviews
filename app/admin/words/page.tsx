@@ -404,7 +404,9 @@ const onWordUpdate = async (data: WordFormData) => {
           </h2>
 
           <div className="flex flex-wrap gap-2">
-            <label className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 cursor-pointer hover:bg-sky-100">
+            <label className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 cursor-pointer hover:bg-sky-100"
+              onClick={() => { if (fileInputRef.current) fileInputRef.current.value = ''; }}
+            >
               <Upload size={17} />
               <span>Import CSV/Excel</span>
               <input
