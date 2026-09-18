@@ -592,6 +592,26 @@ const onWordUpdate = async (data: WordFormData) => {
               <span>Export CSV</span>
             </Button>
             <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                const headers = ['Chinese', 'Pinyin', 'Khmer', 'English', 'HSK Level', 'Class'];
+                const data = filteredWords.map(w => ({
+                  Chinese: w.chinese,
+                  Pinyin: w.pinyin || '',
+                  Khmer: w.khmer || '',
+                  English: w.english || '',
+                  'HSK Level': w.hsk?.replace('HSK ', '') || '',
+                  Class: w.className || '',
+                }));
+                exportToExcel(data, headers, `words-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+                toast({ title: 'Exported', message: `Downloaded ${filteredWords.length} words as Excel (Khmer supported)` });
+              }}
+            >
+              <Download size={17} />
+              <span>Export Excel</span>
+            </Button>
+            <Button
               variant="primary"
               type="button"
               onClick={startAdd}
