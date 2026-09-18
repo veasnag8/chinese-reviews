@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Upload, AlertCircle, CheckCircle, Loader2, X, Table, Download, Eye, EyeOff } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle, Loader2, X, Download, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -484,39 +484,41 @@ const onWordUpdate = async (data: WordFormData) => {
           )}
           <div className="flex-1 overflow-auto p-4">
             {importPreview.length > 0 && (
-              <Table>
-                <thead>
-                  <tr className="border-b text-left text-sm text-muted-foreground">
-                    <th className="p-2">#</th>
-                    <th className="p-2">Chinese</th>
-                    <th className="p-2">Pinyin</th>
-                    <th className="p-2">Khmer</th>
-                    <th className="p-2">English</th>
-                    <th className="p-2">HSK</th>
-                    <th className="p-2">Class ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {importPreview.slice(0, 100).map((row, i) => (
-                    <tr key={i} className="border-b hover:bg-muted/50">
-                      <td className="p-2 text-sm">{i + 1}</td>
-                      <td className="p-2 text-lg font-bold">{row.chinese}</td>
-                      <td className="p-2 text-sm">{row.pinyin || '—'}</td>
-                      <td className="p-2 text-sm">{row.khmer || '—'}</td>
-                      <td className="p-2 text-sm">{row.english || '—'}</td>
-                      <td className="p-2 text-sm">{row.hsk_level ? `HSK ${row.hsk_level}` : '—'}</td>
-                      <td className="p-2 text-sm">{row.class_id || '—'}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b text-left text-sm text-muted-foreground">
+                      <th className="p-2">#</th>
+                      <th className="p-2">Chinese</th>
+                      <th className="p-2">Pinyin</th>
+                      <th className="p-2">Khmer</th>
+                      <th className="p-2">English</th>
+                      <th className="p-2">HSK</th>
+                      <th className="p-2">Class ID</th>
                     </tr>
-                  ))}
-                  {importPreview.length > 100 && (
-                    <tr>
-                      <td colSpan={7} className="p-2 text-center text-muted-foreground">
-                        ... and {importPreview.length - 100} more rows
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </Table>
+                  </thead>
+                  <tbody>
+                    {importPreview.slice(0, 100).map((row, i) => (
+                      <tr key={i} className="border-b hover:bg-muted/50">
+                        <td className="p-2 text-sm">{i + 1}</td>
+                        <td className="p-2 text-lg font-bold">{row.chinese}</td>
+                        <td className="p-2 text-sm">{row.pinyin || '—'}</td>
+                        <td className="p-2 text-sm">{row.khmer || '—'}</td>
+                        <td className="p-2 text-sm">{row.english || '—'}</td>
+                        <td className="p-2 text-sm">{row.hsk_level ? `HSK ${row.hsk_level}` : '—'}</td>
+                        <td className="p-2 text-sm">{row.class_id || '—'}</td>
+                      </tr>
+                    ))}
+                    {importPreview.length > 100 && (
+                      <tr>
+                        <td colSpan={7} className="p-2 text-center text-muted-foreground">
+                          ... and {importPreview.length - 100} more rows
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
           <div className="border-t p-4 flex justify-end gap-2">
