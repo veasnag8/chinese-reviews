@@ -153,31 +153,50 @@ export default function AdminWordsPage() {
     );
   }, [search, words]);
 
-  const getOrCreateClass = async (name: string, date: string) => {
-    if (!supabase) return { id: null, error: "Supabase not configured" };
+const getOrCreateClass = async (name: string, date: string) => {
+    if (!supabase) return { id: null, error: 'Supabase not configured' };
 
     const { data: existing } = await supabase
-      .from("classes")
-      .select("id")
-      .eq("name", name)
-      .eq("date", date)
+      .from('classes')
+      .select('id')
+      .eq('name', name)
+      .eq('date', date)
       .maybeSingle();
 
-    if (existing && typeof existing === "object" && "id" in existing) {
+    if (existing && typeof existing === 'object' && 'id' in existing) {
       return { id: (existing as { id: string }).id };
     }
 
     const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) return { id: null, error: "Not authenticated" };
+    if (!auth.user) return { id: null, error: 'Not authenticated' };
 
     const { data: created, error } = await supabase
-      .from("classes")
+      .from('classes')
       .insert({ name, date, user_id: auth.user.id } as any)
-      .select("id")
+      .select('id')
       .single();
 
     if (error) return { id: null, error: error.message };
     return { id: (created as { id: string } | null)?.id ?? null };
+  };
+
+  const resolveClassId = async (className: string | undefined, classDate: string | undefined): Promise<string | null> => {
+    if (!className || !supabase) return null;
+    // Try to find by name only first
+    const { data: existing } = await supabase
+      .from('classes')
+      .select('id, date')
+      .eq('name', className)
+      .maybeSingle();
+    if (existing && typeof existing === 'object' && 'id' in existing) {
+      return (existing as { id: string }).id;
+    }
+    // If date provided, try to create with name+date
+    if (classDate) {
+      const result = await getOrCreateClass(className, classDate);
+      return result.id;
+    }
+    return null;
   };
 
   const onWordSubmit = async (data: WordFormData) => {
@@ -300,10 +319,34 @@ const onWordUpdate = async (data: WordFormData) => {
       const dataRows = rows.slice(1);
       const validRows: WordImportRow[] = [];
       const errors: { row: number; error: string }[] = [];
+
+      // Pre-fetch all unique class names to resolve in batch
+      const classNames = new Set<string>();
+      dataRows.forEach((row) => {
+        const obj: Record<string, string> = {};
+        headers.forEach((h, i) => { obj[h.toLowerCase().trim()] = row[i]?.trim() || ''; });
+        const className = obj['class'] || obj['class_name'] || obj['classname'] || '';
+        if (className) classNames.add(className);
+      });
+
+      // Resolve all class names to IDs
+      const classNameToId = new Map<string, string | null>();
+      for (const className of classNames) {
+        const classId = await resolveClassId(className, undefined);
+        classNameToId.set(className, classId);
+      }
+
       dataRows.forEach((row, idx) => {
         const rowNum = idx + 2; // +2 for 1-based header + data offset
         const mapped = mapWordRow(row, headers);
         if (mapped) {
+          // Resolve class_id from class name
+          const obj: Record<string, string> = {};
+          headers.forEach((h, i) => { obj[h.toLowerCase().trim()] = row[i]?.trim() || ''; });
+          const className = obj['class'] || obj['class_name'] || obj['classname'] || '';
+          if (className && classNameToId.has(className)) {
+            mapped.class_id = classNameToId.get(className) || undefined;
+          }
           validRows.push(mapped);
         } else {
           // Check what's missing
@@ -349,7 +392,7 @@ const onWordUpdate = async (data: WordFormData) => {
         khmer: w.khmer || null,
         english: w.english || null,
         hsk_level: w.hsk_level || null,
-        class_id: w.class_id || null,
+        class_id: w.class_id || null, // Already resolved during preview
         user_id: user,
       }));
       const { error } = await supabase.from('words').insert(inserts as any);
