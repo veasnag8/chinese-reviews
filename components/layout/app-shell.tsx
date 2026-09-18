@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, GraduationCap, Heart, House, List, ListChecks, LogOut, PenLine, Settings, Sparkles, TextQuote, Users } from 'lucide-react';
+import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -32,6 +32,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [displayName, setDisplayName] = useState('User');
   const [quizCount, setQuizCount] = useState(0);
   const [dailyReviewCount, setDailyReviewCount] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const mobileNavItems = [
+    { href: '/dashboard', label: 'Dashboard', icon: House },
+    { href: '/daily', label: 'Daily', icon: CalendarDays },
+    { href: '/words', label: 'My Words', icon: BookOpen },
+    { href: '/sentences', label: 'Sentence', icon: TextQuote },
+    { href: '/quizzes', label: 'Quiz', icon: ListChecks },
+  ];
+
+  const overflowItems = [
+    { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
+    { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
+    { href: '/favorites', label: 'Favorites', icon: Heart, admin: false },
+    { href: '/progress', label: 'Progress', icon: ChartNoAxesColumnIncreasing, admin: false },
+    { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
+    { href: '/settings', label: 'Settings', icon: Settings, admin: false },
+    { href: '/admin/words', label: 'Words List', icon: List, admin: true },
+    { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList, admin: true },
+    { href: '/admin/users', label: 'User List', icon: Users, admin: true },
+  ];
 
   useEffect(() => {
     const client = supabase;
@@ -160,20 +181,67 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="mt-auto rounded-2xl bg-[#fff8e8] p-4"><Sparkles size={18} className="mb-2 text-amber-500"/><p className="text-sm font-semibold">Keep your streak alive</p><p className="mt-1 text-xs text-slate-500">A little review today goes a long way.</p></div>
     </aside>
     <main className="pb-24 md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6 md:p-8">{children}</div></main>
-    <nav className="fixed inset-x-0 bottom-0 z-10 flex items-center justify-around border-t border-stone-200 bg-white px-2 py-2 md:hidden">
-        {[
-          {href:'/dashboard',label:'Dashboard',icon:House},
-          {href:'/daily',label:'Daily',icon:CalendarDays},
-          {href:'/words',label:'My Words',icon:BookOpen},
-          {href:'/sentences',label:'Sentence',icon:TextQuote},
-          {href:'/classes',label:'My Classes',icon:CalendarDays},
-          {href:'/review',label:'Review',icon:GraduationCap},
-          {href:'/quizzes',label:'Quiz',icon:ListChecks},
-          {href:'/writing',label:'Practice',icon:PenLine},
-          {href:'/favorites',label:'Favorites',icon:Heart},
-          {href:'/progress',label:'Progress',icon:ChartNoAxesColumnIncreasing},
-          {href:'/settings',label:'Settings',icon:Settings},
-        ].map(({href,label,icon:Icon}) => <Link key={label} href={href} className={`flex min-w-14 flex-col items-center gap-1 rounded-lg px-2 py-1 text-[11px] ${pathname === href ? 'text-[#b91c1c]' : 'text-slate-500'}`}><Icon size={19}/><span>{label}{(href === '/quizzes' && quizCount > 0) && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{quizCount}</span>}{(href === '/review' && dailyReviewCount > 0) && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{dailyReviewCount}</span>}</span></Link>)}
-      </nav>
+    
+    {/* Mobile bottom nav - 5 main items + menu */}
+    <nav className="fixed inset-x-0 bottom-0 z-10 flex items-center justify-between border-t border-stone-200 bg-white px-2 py-2 md:hidden">
+      {mobileNavItems.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          onClick={() => setMobileMenuOpen(false)}
+          className={`flex min-w-14 flex-col items-center gap-1 rounded-lg px-2 py-1 text-[11px] ${pathname === href ? 'text-[#b91c1c]' : 'text-slate-500'}`}
+        >
+          <Icon size={19} />
+          <span>
+            {label}
+            {(href === '/quizzes' && quizCount > 0) && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{quizCount}</span>}
+            {(href === '/review' && dailyReviewCount > 0) && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{dailyReviewCount}</span>}
+          </span>
+        </Link>
+      ))}
+      <button
+        onClick={() => setMobileMenuOpen(true)}
+        className="flex min-w-14 flex-col items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-slate-500"
+        aria-label="More options"
+      >
+        <Menu size={19} />
+        <span>More</span>
+      </button>
+    </nav>
+
+    {/* Overflow menu dialog */}
+    {mobileMenuOpen && (
+      <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+        <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
+        <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl p-4 animate-slide-up max-h-[80vh] overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg">More</h3>
+            <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-lg hover:bg-stone-100"><X size={20} /></button>
+          </div>
+          <nav className="space-y-2">
+            {overflowItems.map(({ href, label, icon: Icon, admin }) => (
+              !admin || isStaff ? (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium ${pathname === href ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-700 hover:bg-stone-100'}`}
+                >
+                  <Icon size={20} />
+                  {label}
+                  {(href === '/quizzes' && quizCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-2 py-1 text-xs font-semibold text-white">{quizCount}</span>}
+                  {(href === '/review' && dailyReviewCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-2 py-1 text-xs font-semibold text-white">{dailyReviewCount}</span>}
+                </Link>
+              ) : null
+            ))}
+            <hr className="my-2 border-stone-200" />
+            <button onClick={logout} className="flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium text-red-600 hover:bg-red-50 w-full">
+              <LogOut size={20} />
+              Sign out
+            </button>
+          </nav>
+        </div>
+      </div>
+    )}
   </div>
 }
