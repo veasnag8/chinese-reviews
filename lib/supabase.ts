@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 import { type Database } from "@/supabase/types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,18 +8,7 @@ const supabaseAnonKey =
 
 export const supabase =
   supabaseUrl && supabaseAnonKey
-    ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          autoRefreshToken: true,
-          persistSession: true,
-          detectSessionInUrl: true,
-        },
-        realtime: {
-          params: {
-            eventsPerSecond: 10,
-          },
-        },
-      })
+    ? createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
     : null;
 
 export type { Database };

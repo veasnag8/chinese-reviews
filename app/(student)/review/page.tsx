@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, RotateCcw, Send, Trophy, X } from 'lucide-react';
+import { Check, RotateCcw, Trophy, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { resolveDisplayName, sendQuizNotification } from '@/lib/notify';
 import { meaningFromWord, pickSimilarDistractors, shuffleChoices, type QuizMeaning } from '@/lib/quiz/distractors';
 
 type QuizQuestion = {
@@ -34,7 +33,7 @@ type WordRow = {
   classes?: { date?: string | null } | null;
 };
 
-export default function QuizPage() {
+export default function ReviewPage() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [wordPool, setWordPool] = useState<QuizMeaning[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,9 +42,8 @@ export default function QuizPage() {
   const [checked, setChecked] = useState(false);
   const [score, setScore] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [submitError, setSubmitError] = useState('');
+  const [completed, setCompleted] = useState(false);
+  const [completeError, setCompleteError] = useState('');
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -142,59 +140,36 @@ export default function QuizPage() {
     setChecked(false);
     setScore(0);
     setAnswers([]);
-    setSubmitted(false);
-    setSubmitError('');
+    setCompleted(false);
+    setCompleteError('');
   };
 
-  const submitQuiz = async () => {
-    if (!supabase || submitted || submitting) return;
-    setSubmitting(true);
-    setSubmitError('');
+  const completeReview = async () => {
+    if (!supabase || completed) return;
+    setCompleteError('');
 
     const { data: authData } = await supabase.auth.getUser();
     const user = authData.user;
     if (!user) {
-      setSubmitError('Please sign in again.');
-      setSubmitting(false);
+      setCompleteError('Please sign in again.');
       return;
     }
 
-    const runId = crypto.randomUUID();
-    const attempts = quizQuestions.map((q) => {
-      const answer = answers.find((item) => item.question_id === q.id);
-      return {
-        user_id: user.id,
-        quiz_id: runId,
-        question_id: q.id,
-        selected_answer: answer?.selected_answer ?? null,
-        is_correct: answer?.is_correct ?? false,
-        time_spent: 0,
-        completed_at: new Date().toISOString(),
-      };
-    });
-
-    const { error: attemptsError } = await supabase.from('quiz_attempts').insert(attempts as never);
-    if (attemptsError) {
-      setSubmitError(attemptsError.message);
-      setSubmitting(false);
+    const { error } = await supabase.rpc('complete_daily_review');
+    if (error) {
+      setCompleteError(error.message);
       return;
     }
 
-    const result = await sendQuizNotification(
-      'quiz-submission',
-      `${resolveDisplayName(user)} submitted the quiz and scored ${score} / ${quizQuestions.length}`
-    );
-    if (!result.ok) setSubmitError(result.error || 'Could not notify other users.');
-    setSubmitted(true);
-    setSubmitting(false);
+    setCompleted(true);
   };
 
-  if (loading) return <p className="text-slate-500">Loading quiz...</p>;
+  if (loading) return <p className="text-slate-500">Loading review...</p>;
 
   if (questions.length < 2)
     return (
       <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-slate-500">
-        Not enough words from the last 7 days. Add more words to play.
+        Not enough words from the last 7 days. Add more words to practice.
       </div>
     );
 
@@ -202,22 +177,21 @@ export default function QuizPage() {
     return (
       <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
         <Trophy className="mx-auto text-amber-500" size={42} />
-        <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">QUIZ COMPLETE</p>
+        <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW COMPLETE</p>
         <h1 className="mt-2 text-3xl font-bold">
           Your score: {score} / {quizQuestions.length}
         </h1>
-        {submitError && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{submitError}</p>}
-        {submitted ? (
+        {completeError && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{completeError}</p>}
+        {completed ? (
           <p className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
-            <Check size={16} /> Submitted — other users were notified.
+            <Check size={16} /> Daily review completed!
           </p>
         ) : (
           <button
-            onClick={submitQuiz}
-            disabled={submitting}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            onClick={completeReview}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white"
           >
-            <Send size={17} /> {submitting ? 'Submitting...' : 'Submit quiz'}
+            <Check size={17} /> Complete review
           </button>
         )}
         <button onClick={restart} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">
@@ -239,7 +213,7 @@ export default function QuizPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Daily Quiz</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Daily Review</p>
           <h1 className="mt-1 text-3xl font-bold">Test your Chinese (Last 7 Days)</h1>
         </div>
         <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
