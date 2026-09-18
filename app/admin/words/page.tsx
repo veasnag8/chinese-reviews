@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Upload, AlertCircle, CheckCircle, Loader2, X, Table, Download, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
 import { todayISO } from "@/lib/schedule";
+import { parseCSV, parseExcel, mapWordRow, type WordImportRow } from '@/lib/import';
 
 const wordSchema = z.object({
   chinese: z.string().min(1, "Chinese is required"),
@@ -39,6 +41,14 @@ export default function AdminWordsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingWord, setEditingWord] = useState<any | null>(null);
+
+  // Import state
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importPreview, setImportPreview] = useState<WordImportRow[]>([]);
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchUser();
@@ -266,6 +276,65 @@ const onWordUpdate = async (data: WordFormData) => {
     await fetchWords();
   };
 
+  const handleFileSelect = async (file: File) => {
+    if (!user) { setImportError('Please sign in first.'); return; }
+    setImportError('');
+    setImportPreview([]);
+    setImportHeaders([]);
+    try {
+      let rows: string[][];
+      if (file.name.endsWith('.csv')) {
+        const text = await file.text();
+        rows = parseCSV(text);
+      } else {
+        rows = await parseExcel(file);
+      }
+      if (rows.length < 2) { setImportError('File must have header + at least 1 row.'); return; }
+      const headers = rows[0];
+      const dataRows = rows.slice(1);
+      const validRows: WordImportRow[] = [];
+      for (const row of dataRows) {
+        const mapped = mapWordRow(row, headers);
+        if (mapped) validRows.push(mapped);
+      }
+      if (validRows.length === 0) { setImportError('No valid words found. Check column names.'); return; }
+      setImportHeaders(headers);
+      setImportPreview(validRows);
+      setShowImportDialog(true);
+    } catch (e: any) {
+      setImportError(e.message || 'Failed to parse file');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!user || importPreview.length === 0) return;
+    setImporting(true);
+    setImportError('');
+    try {
+      const inserts = importPreview.map(w => ({
+        chinese: w.chinese,
+        pinyin: w.pinyin || null,
+        khmer: w.khmer || null,
+        english: w.english || null,
+        hsk_level: w.hsk_level || null,
+        class_id: w.class_id || null,
+        user_id: user,
+      }));
+      const { error } = await supabase.from('words').insert(inserts as any);
+      if (error) throw error;
+      setShowImportDialog(false);
+      setImportPreview([]);
+      setImportHeaders([]);
+      await fetchWords();
+    } catch (e: any) {
+      setImportError(e.message || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const startAdd = () => {
     setEditingWord(null);
     setIsEditing(true);
@@ -296,13 +365,27 @@ const onWordUpdate = async (data: WordFormData) => {
             Manage Words
           </h2>
 
-          <Button
-            variant="primary"
-            type="button"
-            onClick={startAdd}
-          >
-            + Add Word
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <label className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 cursor-pointer hover:bg-sky-100">
+              <Upload size={17} />
+              <span>Import CSV/Excel</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                className="hidden"
+                disabled={importing}
+              />
+            </label>
+            <Button
+              variant="primary"
+              type="button"
+              onClick={startAdd}
+            >
+              + Add Word
+            </Button>
+          </div>
         </div>
 
         {isEditing && (
@@ -587,8 +670,72 @@ reset({
               </table>
             </div>
           )}
-        </div>
+</div>
       </div>
     </div>
   );
+
+  // Import Preview Dialog
+  if (showImportDialog) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between border-b p-4">
+            <h3 className="text-lg font-semibold">Import Preview — {importPreview.length} words</h3>
+            <button onClick={() => setShowImportDialog(false)} className="p-2 hover:bg-muted rounded-lg"><X size={20} /></button>
+          </div>
+          {importError && (
+            <div className="border-b border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
+              <AlertCircle size={16} /> {importError}
+            </div>
+          )}
+          <div className="flex-1 overflow-auto p-4">
+            {importPreview.length > 0 && (
+              <Table>
+                <thead>
+                  <tr className="border-b text-left text-sm text-muted-foreground">
+                    <th className="p-2">#</th>
+                    <th className="p-2">Chinese</th>
+                    <th className="p-2">Pinyin</th>
+                    <th className="p-2">Khmer</th>
+                    <th className="p-2">English</th>
+                    <th className="p-2">HSK</th>
+                    <th className="p-2">Class ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.slice(0, 100).map((row, i) => (
+                    <tr key={i} className="border-b hover:bg-muted/50">
+                      <td className="p-2 text-sm">{i + 1}</td>
+                      <td className="p-2 text-lg font-bold">{row.chinese}</td>
+                      <td className="p-2 text-sm">{row.pinyin || '—'}</td>
+                      <td className="p-2 text-sm">{row.khmer || '—'}</td>
+                      <td className="p-2 text-sm">{row.english || '—'}</td>
+                      <td className="p-2 text-sm">{row.hsk_level ? `HSK ${row.hsk_level}` : '—'}</td>
+                      <td className="p-2 text-sm">{row.class_id || '—'}</td>
+                    </tr>
+                  ))}
+                  {importPreview.length > 100 && (
+                    <tr>
+                      <td colSpan={7} className="p-2 text-center text-muted-foreground">
+                        ... and {importPreview.length - 100} more rows
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            )}
+          </div>
+          <div className="border-t p-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowImportDialog(false)} disabled={importing}>
+              Cancel
+            </Button>
+            <Button onClick={confirmImport} disabled={importing}>
+              {importing ? (<><Loader2 size={16} className="animate-spin mr-2" /> Importing...</>) : (`Import ${importPreview.length} Words`)}
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 }
