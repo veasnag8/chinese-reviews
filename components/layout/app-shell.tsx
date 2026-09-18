@@ -54,6 +54,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: '/admin/users', label: 'User List', icon: Users, admin: true },
   ];
 
+  const overflowNotificationCount = quizCount + dailyReviewCount;
+
   useEffect(() => {
     const client = supabase;
     if (!client) return;
@@ -201,11 +203,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       ))}
       <button
         onClick={() => setMobileMenuOpen(true)}
-        className="flex min-w-14 flex-col items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-slate-500"
+        className="flex min-w-14 flex-col items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-slate-500 relative"
         aria-label="More options"
       >
         <Menu size={19} />
         <span>More</span>
+        {overflowNotificationCount > 0 && (
+          <span className="absolute -top-1 -right-1 inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
+            {overflowNotificationCount}
+          </span>
+        )}
       </button>
     </nav>
 
