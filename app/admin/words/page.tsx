@@ -47,6 +47,7 @@ export default function AdminWordsPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [importPreview, setImportPreview] = useState<WordImportRow[]>([]);
+  const [importErrors, setImportErrors] = useState<{ row: number; error: string }[]>([]);
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -280,6 +281,7 @@ const onWordUpdate = async (data: WordFormData) => {
     if (!user) { setImportError('Please sign in first.'); return; }
     setImportError('');
     setImportPreview([]);
+    setImportErrors([]);
     setImportHeaders([]);
     try {
       let rows: string[][];
@@ -293,13 +295,32 @@ const onWordUpdate = async (data: WordFormData) => {
       const headers = rows[0];
       const dataRows = rows.slice(1);
       const validRows: WordImportRow[] = [];
-      for (const row of dataRows) {
+      const errors: { row: number; error: string }[] = [];
+      dataRows.forEach((row, idx) => {
+        const rowNum = idx + 2; // +2 for 1-based header + data offset
         const mapped = mapWordRow(row, headers);
-        if (mapped) validRows.push(mapped);
+        if (mapped) {
+          validRows.push(mapped);
+        } else {
+          // Check what's missing
+          const obj: Record<string, string> = {};
+          headers.forEach((h, i) => { obj[h.toLowerCase().trim()] = row[i]?.trim() || ''; });
+          const chinese = obj['chinese'] || obj['word'] || obj['hanzi'] || '';
+          if (!chinese) {
+            errors.push({ row: rowNum, error: 'Missing required "Chinese" column' });
+          } else {
+            errors.push({ row: rowNum, error: 'Invalid row data' });
+          }
+        }
+      });
+      if (validRows.length === 0) { 
+        setImportError(errors.length > 0 ? `All ${errors.length} rows failed. First error: ${errors[0].error}` : 'No valid words found. Check column names.');
+        setImportErrors(errors);
+        return; 
       }
-      if (validRows.length === 0) { setImportError('No valid words found. Check column names.'); return; }
       setImportHeaders(headers);
       setImportPreview(validRows);
+      setImportErrors(errors);
       setShowImportDialog(true);
     } catch (e: any) {
       setImportError(e.message || 'Failed to parse file');
@@ -323,11 +344,28 @@ const onWordUpdate = async (data: WordFormData) => {
         user_id: user,
       }));
       const { error } = await supabase.from('words').insert(inserts as any);
-      if (error) throw error;
-      setShowImportDialog(false);
-      setImportPreview([]);
-      setImportHeaders([]);
-      await fetchWords();
+      if (error) {
+        // Try individual inserts to find which rows fail
+        const insertErrors: { row: number; error: string }[] = [];
+        for (let i = 0; i < inserts.length; i++) {
+          const { error: rowError } = await supabase.from('words').insert(inserts[i] as any);
+          if (rowError) {
+            insertErrors.push({ row: i + 1, error: rowError.message });
+          }
+        }
+        if (insertErrors.length > 0) {
+          setImportErrors(insertErrors);
+          setImportError(`${insertErrors.length} of ${inserts.length} rows failed. See details below.`);
+        } else {
+          throw error;
+        }
+      } else {
+        setShowImportDialog(false);
+        setImportPreview([]);
+        setImportHeaders([]);
+        setImportErrors([]);
+        await fetchWords();
+      }
     } catch (e: any) {
       setImportError(e.message || 'Import failed');
     } finally {
@@ -687,6 +725,19 @@ reset({
           {importError && (
             <div className="border-b border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
               <AlertCircle size={16} /> {importError}
+            </div>
+          )}
+          {importErrors.length > 0 && (
+            <div className="border-b border-amber-200 bg-amber-50 p-3">
+              <div className="flex items-center gap-2 text-amber-700 font-medium mb-2">
+                <AlertCircle size={16} /> {importErrors.length} row error(s) — fix in Excel and re-import
+              </div>
+              <div className="max-h-40 overflow-auto text-sm">
+                {importErrors.slice(0, 20).map((e, i) => (
+                  <div key={i} className="text-amber-800 font-mono">Row {e.row}: {e.error}</div>
+                ))}
+                {importErrors.length > 20 && <div className="text-amber-600">... and {importErrors.length - 20} more</div>}
+              </div>
             </div>
           )}
           <div className="flex-1 overflow-auto p-4">
