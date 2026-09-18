@@ -95,3 +95,27 @@ export function mapSentenceRow(row: string[], headers: string[]): SentenceImport
     class_id: obj['class_id'] || obj['class'] || undefined,
   };
 }
+
+export function exportToCSV(data: any[], headers: string[]): string {
+  const escapeCell = (cell: any) => {
+    if (cell === null || cell === undefined) return '';
+    const str = String(cell);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  };
+  
+  const headerRow = headers.map(escapeCell).join(',');
+  const rows = data.map(row => headers.map(h => escapeCell(row[h])).join(','));
+  return [headerRow, ...rows].join('\n');
+}
+
+export function exportToExcel(data: any[], headers: string[], filename: string): void {
+  const XLSX = require('xlsx');
+  const worksheetData = [headers, ...data.map(row => headers.map(h => row[h] || ''))];
+  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Words');
+  XLSX.writeFile(workbook, filename);
+}

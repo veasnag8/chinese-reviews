@@ -12,7 +12,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
 import { todayISO } from "@/lib/schedule";
-import { parseCSV, parseExcel, mapWordRow, type WordImportRow } from '@/lib/import';
+import { parseCSV, parseExcel, mapWordRow, type WordImportRow, exportToCSV, exportToExcel } from '@/lib/import';
 import { useToasts } from '@/components/ui/toast';
 
 const wordSchema = z.object({
@@ -565,6 +565,32 @@ const onWordUpdate = async (data: WordFormData) => {
                 disabled={importing}
               />
             </label>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                const headers = ['Chinese', 'Pinyin', 'Khmer', 'English', 'HSK Level', 'Class'];
+                const data = filteredWords.map(w => ({
+                  Chinese: w.chinese,
+                  Pinyin: w.pinyin || '',
+                  Khmer: w.khmer || '',
+                  English: w.english || '',
+                  'HSK Level': w.hsk?.replace('HSK ', '') || '',
+                  Class: w.className || '',
+                }));
+                const csv = exportToCSV(data, headers);
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `words-export-${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                toast({ title: 'Exported', message: `Downloaded ${filteredWords.length} words as CSV` });
+              }}
+            >
+              <Download size={17} />
+              <span>Export CSV</span>
+            </Button>
             <Button
               variant="primary"
               type="button"
