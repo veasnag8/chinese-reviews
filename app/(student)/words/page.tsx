@@ -1,10 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Filter } from 'lucide-react';
+import { Upload, Download, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Heart, Search, Volume2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { fetchFavoriteIds, toggleFavorite } from '@/lib/favorites';
+import { parseCSV, parseExcel, mapWordRow, type WordImportRow } from '@/lib/import';
 
 type WordItem = {
   id: string;
@@ -45,8 +46,66 @@ export default function WordsPage() {
   const [favoriteError, setFavoriteError] = useState('');
   const [pendingFavorites, setPendingFavorites] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState(0);
   const pendingFavoriteIds = useRef(new Set<string>());
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const ITEMS_PER_PAGE = 12;
+
+  const handleImport = async (file: File) => {
+    if (!userId) { setImportError('Please sign in first.'); return; }
+    setImporting(true);
+    setImportError('');
+    setImportSuccess(0);
+    try {
+      let rows: string[][];
+      if (file.name.endsWith('.csv')) {
+        const text = await file.text();
+        rows = parseCSV(text);
+      } else {
+        rows = await parseExcel(file);
+      }
+      if (rows.length < 2) { setImportError('File must have header + at least 1 row.'); return; }
+      const headers = rows[0];
+      const dataRows = rows.slice(1);
+      const validRows: WordImportRow[] = [];
+      for (const row of dataRows) {
+        const mapped = mapWordRow(row, headers);
+        if (mapped) validRows.push(mapped);
+      }
+      if (validRows.length === 0) { setImportError('No valid words found. Check column names.'); return; }
+
+      const inserts = validRows.map(w => ({
+        chinese: w.chinese,
+        pinyin: w.pinyin || null,
+        khmer: w.khmer || null,
+        english: w.english || null,
+        hsk_level: w.hsk_level || null,
+        class_id: w.class_id || null,
+        user_id: userId,
+      }));
+
+      const { error } = await supabase.from('words').insert(inserts as any);
+      if (error) throw error;
+      setImportSuccess(validRows.length);
+      setWords((current) => [...validRows.map((w, i) => ({ 
+        id: `temp-${Date.now()}-${i}`,
+        chinese: w.chinese,
+        pinyin: w.pinyin || '',
+        khmer: w.khmer || '',
+        english: w.english || '',
+        className: w.class_id || 'Imported',
+        hsk: w.hsk_level ? `HSK ${w.hsk_level}` : '',
+        favorite: false,
+      })), ...current]);
+    } catch (e: any) {
+      setImportError(e.message || 'Import failed');
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     const loadWords = async () => {
@@ -180,7 +239,29 @@ export default function WordsPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <label className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 cursor-pointer hover:bg-sky-100">
+          <Upload size={17} />
+          <span>Import CSV/Excel</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
+            className="hidden"
+            disabled={importing}
+          />
+        </label>
+        {importSuccess > 0 && (
+          <span className="flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+            <CheckCircle size={16} /> Imported {importSuccess} words
+          </span>
+        )}
+      </div>
+
       {favoriteError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{favoriteError}</p>}
+      {importError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2"><AlertCircle size={16} />{importError}</p>}
+      {importing && <p className="text-sm text-sky-600 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Importing...</p>}
 
       {loading ? (
         <p className="text-slate-500">Loading words...</p>

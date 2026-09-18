@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Heart } from "lucide-react";
+import { Heart, Upload, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { fetchFavoriteIds, toggleFavorite } from "@/lib/favorites";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
+import { parseCSV, parseExcel, mapSentenceRow, type SentenceImportRow } from '@/lib/import';
 
 const sentenceSchema = z.object({
   chineseSentence: z.string().min(1, "Sentence is required"),
@@ -37,8 +38,63 @@ export default function SentencesPage() {
   const [favoritesReady, setFavoritesReady] = useState(false);
   const [pendingFavorites, setPendingFavorites] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState(0);
   const pendingFavoriteIds = useRef(new Set<string>());
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const ITEMS_PER_PAGE = 12;
+
+  const handleImport = async (file: File) => {
+    if (!user) { setImportError('Please sign in first.'); return; }
+    setImporting(true);
+    setImportError('');
+    setImportSuccess(0);
+    try {
+      let rows: string[][];
+      if (file.name.endsWith('.csv')) {
+        const text = await file.text();
+        rows = parseCSV(text);
+      } else {
+        rows = await parseExcel(file);
+      }
+      if (rows.length < 2) { setImportError('File must have header + at least 1 row.'); return; }
+      const headers = rows[0];
+      const dataRows = rows.slice(1);
+      const validRows: SentenceImportRow[] = [];
+      for (const row of dataRows) {
+        const mapped = mapSentenceRow(row, headers);
+        if (mapped) validRows.push(mapped);
+      }
+      if (validRows.length === 0) { setImportError('No valid sentences found. Check column names.'); return; }
+
+      const inserts = validRows.map(s => ({
+        chinese_sentence: s.chinese_sentence,
+        pinyin: s.pinyin || null,
+        khmer_translation: s.khmer_translation || null,
+        english_translation: s.english_translation || null,
+        class_id: s.class_id || null,
+        user_id: user,
+      }));
+
+      const { error } = await supabase.from('sentences').insert(inserts as any);
+      if (error) throw error;
+      setImportSuccess(validRows.length);
+      setSentences((current) => [...validRows.map((s, i) => ({ 
+        id: `temp-${Date.now()}-${i}`,
+        chinese_sentence: s.chinese_sentence,
+        pinyin: s.pinyin || '',
+        khmer_translation: s.khmer_translation || '',
+        english_translation: s.english_translation || '',
+        classes: { name: s.class_id || 'Imported' },
+      })), ...current]);
+    } catch (e: any) {
+      setImportError(e.message || 'Import failed');
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
@@ -206,14 +262,35 @@ export default function SentencesPage() {
             My Sentences
           </h2>
 
-          {isStaff && (
-            <Button variant="primary" type="button" onClick={() => setIsAdding(true)}>
-              + Add Sentence
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {isStaff && (
+              <Button variant="primary" type="button" onClick={() => setIsAdding(true)}>
+                + Add Sentence
+              </Button>
+            )}
+            <label className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 cursor-pointer hover:bg-sky-100">
+              <Upload size={17} />
+              <span>Import CSV/Excel</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0])}
+                className="hidden"
+                disabled={importing}
+              />
+            </label>
+            {importSuccess > 0 && (
+              <span className="flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                <CheckCircle size={16} /> Imported {importSuccess} sentences
+              </span>
+            )}
+          </div>
         </div>
 
         {favoriteError && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{favoriteError}</p>}
+        {importError && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2"><AlertCircle size={16} />{importError}</p>}
+        {importing && <p className="mb-4 text-sm text-sky-600 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Importing...</p>}
 
         {formState === "error" && (
           <div className="mb-4 rounded-md border border-destructive p-3 text-destructive">
