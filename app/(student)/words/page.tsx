@@ -44,7 +44,9 @@ export default function WordsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [favoriteError, setFavoriteError] = useState('');
   const [pendingFavorites, setPendingFavorites] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
   const pendingFavoriteIds = useRef(new Set<string>());
+  const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
     const loadWords = async () => {
@@ -119,7 +121,7 @@ export default function WordsPage() {
     [words]
   );
 
-  const list = useMemo(
+  const filteredWords = useMemo(
     () =>
       words
         .filter((w) => {
@@ -133,6 +135,12 @@ export default function WordsPage() {
         })
         .sort((a, b) => a.className.localeCompare(b.className)),
     [words, q, classFilter]
+  );
+
+  const totalPages = Math.ceil(filteredWords.length / ITEMS_PER_PAGE);
+  const list = useMemo(
+    () => filteredWords.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE),
+    [filteredWords, currentPage]
   );
 
   return (
@@ -230,6 +238,28 @@ export default function WordsPage() {
       {!loading && list.length === 0 && (
         <div className="rounded-2xl border border-dashed border-stone-300 p-10 text-center text-slate-500">
           No words found. Try another search.
+        </div>
+      )}
+
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-6">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+          >
+            Previous
+          </button>
+          <span className="text-sm font-medium text-slate-700">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

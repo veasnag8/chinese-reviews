@@ -36,7 +36,9 @@ export default function SentencesPage() {
   const [favoriteError, setFavoriteError] = useState('');
   const [favoritesReady, setFavoritesReady] = useState(false);
   const [pendingFavorites, setPendingFavorites] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
   const pendingFavoriteIds = useRef(new Set<string>());
+  const ITEMS_PER_PAGE = 12;
 
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
@@ -267,91 +269,117 @@ export default function SentencesPage() {
             </p>
           </EmptyState>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-card">
-                  <th className="p-3 text-left">Sentence</th>
-                  <th className="p-3 text-left">Pinyin</th>
-                  <th className="p-3 text-left">Khmer</th>
-                  <th className="p-3 text-left">English</th>
-                  <th className="p-3 text-left">Class</th>
-                  <th className="p-3 text-left">Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {sentences.map((sentence: any) => (
-                  <tr
-                    key={sentence.id}
-                    className="hover:bg-muted/50"
-                  >
-                    <td className="p-3 truncate">
-                      {sentence.chinese_sentence}
-                    </td>
-
-                    <td className="p-3">
-                      {sentence.pinyin || "—"}
-                    </td>
-
-                    <td className="p-3">
-                      {sentence.khmer_translation || "—"}
-                    </td>
-
-                    <td className="p-3">
-                      {sentence.english_translation || "—"}
-                    </td>
-
-                    <td className="p-3">
-                      {sentence.classes?.name ||
-                        sentence.classes?.date ||
-                        sentence.class_name ||
-                        "—"}
-                    </td>
-
-                    <td className="p-3 flex gap-2">
-                      <button
-                        type="button"
-                        disabled={!favoritesReady || pendingFavorites.has(sentence.id)}
-                        onClick={() => void toggleSentenceFavorite(sentence.id)}
-                        aria-pressed={favoriteSentences.has(sentence.id)}
-                        aria-label={`${favoriteSentences.has(sentence.id) ? 'Remove' : 'Save'} sentence ${favoriteSentences.has(sentence.id) ? 'from' : 'to'} favorites`}
-                        className={`rounded-lg p-2 disabled:opacity-50 ${favoriteSentences.has(sentence.id) ? 'text-red-500' : 'text-slate-400'}`}
-                      >
-                        <Heart size={20} fill={favoriteSentences.has(sentence.id) ? 'currentColor' : 'none'} />
-                      </button>
-                      {isAdmin ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            type="button"
-                          >
-                            Edit
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            type="button"
-                            onClick={() =>
-                              deleteSentence(sentence.id)
-                            }
-                          >
-                            Delete
-                          </Button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Admin only
-                        </span>
-                      )}
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-card">
+                    <th className="p-3 text-left">Sentence</th>
+                    <th className="p-3 text-left">Pinyin</th>
+                    <th className="p-3 text-left">Khmer</th>
+                    <th className="p-3 text-left">English</th>
+                    <th className="p-3 text-left">Class</th>
+                    <th className="p-3 text-left">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody>
+                  {sentences
+                    .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+                    .map((sentence: any) => (
+                      <tr
+                        key={sentence.id}
+                        className="hover:bg-muted/50"
+                      >
+                        <td className="p-3 truncate">
+                          {sentence.chinese_sentence}
+                        </td>
+
+                        <td className="p-3">
+                          {sentence.pinyin || "—"}
+                        </td>
+
+                        <td className="p-3">
+                          {sentence.khmer_translation || "—"}
+                        </td>
+
+                        <td className="p-3">
+                          {sentence.english_translation || "—"}
+                        </td>
+
+                        <td className="p-3">
+                          {sentence.classes?.name ||
+                            sentence.classes?.date ||
+                            sentence.class_name ||
+                            "—"}
+                        </td>
+
+                        <td className="p-3 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={!favoritesReady || pendingFavorites.has(sentence.id)}
+                            onClick={() => void toggleSentenceFavorite(sentence.id)}
+                            aria-pressed={favoriteSentences.has(sentence.id)}
+                            aria-label={`${favoriteSentences.has(sentence.id) ? 'Remove' : 'Save'} sentence ${favoriteSentences.has(sentence.id) ? 'from' : 'to'} favorites`}
+                            className={`rounded-lg p-2 disabled:opacity-50 ${favoriteSentences.has(sentence.id) ? 'text-red-500' : 'text-slate-400'}`}
+                          >
+                            <Heart size={20} fill={favoriteSentences.has(sentence.id) ? 'currentColor' : 'none'} />
+                          </button>
+                          {isAdmin ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                type="button"
+                              >
+                                Edit
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                type="button"
+                                onClick={() =>
+                                  deleteSentence(sentence.id)
+                                }
+                              >
+                                Delete
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Admin only
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            {Math.ceil(sentences.length / ITEMS_PER_PAGE) > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm font-medium text-slate-700">
+                  Page {currentPage} of {Math.ceil(sentences.length / ITEMS_PER_PAGE)}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(Math.ceil(sentences.length / ITEMS_PER_PAGE), p + 1))}
+                  disabled={currentPage === Math.ceil(sentences.length / ITEMS_PER_PAGE)}
+                  className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
