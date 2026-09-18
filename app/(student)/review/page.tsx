@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, RotateCcw, Trophy, X } from 'lucide-react';
+import { Check, RotateCcw, Trophy, X, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { meaningFromWord, pickSimilarDistractors, shuffleChoices, type QuizMeaning } from '@/lib/quiz/distractors';
 
@@ -44,6 +44,20 @@ export default function ReviewPage() {
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [completed, setCompleted] = useState(false);
   const [completeError, setCompleteError] = useState('');
+  const [reviewCompletedToday, setReviewCompletedToday] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+    const checkReviewStatus = async () => {
+      if (!supabase) return;
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) return;
+      
+      const { data } = await supabase.rpc('has_completed_daily_review');
+      setReviewCompletedToday(data === true);
+    };
+    checkReviewStatus();
+  }, []);
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -142,6 +156,7 @@ export default function ReviewPage() {
     setAnswers([]);
     setCompleted(false);
     setCompleteError('');
+    setShowResults(false);
   };
 
   const completeReview = async () => {
@@ -162,9 +177,25 @@ export default function ReviewPage() {
     }
 
     setCompleted(true);
+    setShowResults(true);
+    setReviewCompletedToday(true);
   };
 
   if (loading) return <p className="text-slate-500">Loading review...</p>;
+
+  // Show completed message if already done today
+  if (reviewCompletedToday && !showResults && !completed) {
+    return (
+      <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+        <Trophy className="mx-auto text-amber-500" size={42} />
+        <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW TODAY HAS BEEN COMPLETED</p>
+        <p className="mt-2 text-slate-600">You've already completed your daily review. Come back tomorrow!</p>
+        <button onClick={restart} className="mt-6 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">
+          <RotateCcw size={17} /> Try again (for practice)
+        </button>
+      </div>
+    );
+  }
 
   if (questions.length < 2)
     return (
@@ -173,33 +204,75 @@ export default function ReviewPage() {
       </div>
     );
 
-  if (!question)
+  // Show results after completion
+  if (showResults || (completed && !question)) {
     return (
-      <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-        <Trophy className="mx-auto text-amber-500" size={42} />
-        <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW COMPLETE</p>
-        <h1 className="mt-2 text-3xl font-bold">
-          Your score: {score} / {quizQuestions.length}
-        </h1>
-        {completeError && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{completeError}</p>}
-        {completed ? (
-          <p className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
-            <Check size={16} /> Daily review completed!
-          </p>
-        ) : (
-          <button
-            onClick={completeReview}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white"
-          >
-            <Check size={17} /> Complete review
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+          <Trophy className="mx-auto text-amber-500" size={42} />
+          <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW COMPLETE</p>
+          <h1 className="mt-2 text-3xl font-bold">
+            Your score: {score} / {quizQuestions.length}
+          </h1>
+          {completeError && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{completeError}</p>}
+          {completed && (
+            <p className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
+              <Check size={16} /> Daily review completed!
+            </p>
+          )}
+        </div>
+
+        {/* Results breakdown - check answer word by word */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold mb-4">Review Results</h2>
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {answers.map((answer, idx) => {
+              const q = quizQuestions.find(qq => qq.id === answer.question_id);
+              const isCorrect = answer.is_correct;
+              return (
+                <div key={answer.question_id} className={`rounded-xl p-4 ${isCorrect ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium">Question {idx + 1}</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                      {isCorrect ? (
+                        <>
+                          <Check size={12} /> Correct
+                        </>
+                      ) : (
+                        <>
+                          <X size={12} /> Incorrect
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-center mb-2">{q?.chinese}</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className={`p-2 rounded ${isCorrect ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                      <span className="font-medium">Your answer:</span> {answer.selected_answer || '(no answer)'}
+                    </div>
+                    <div className="p-2 rounded bg-emerald-100">
+                      <span className="font-medium">Correct:</span> {q?.correct_answer}
+                    </div>
+                    {q?.pinyin && <div className="col-span-2 p-2 rounded bg-slate-100"><span className="font-medium">Pinyin:</span> {q.pinyin}</div>}
+                    {q?.khmer && <div className="col-span-2 p-2 rounded bg-slate-100"><span className="font-medium">Khmer:</span> {q.khmer}</div>}
+                    {q?.english && <div className="col-span-2 p-2 rounded bg-slate-100"><span className="font-medium">English:</span> {q.english}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-center gap-3">
+          <button onClick={restart} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">
+            <RotateCcw size={17} /> Try again
           </button>
-        )}
-        <button onClick={restart} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">
-          <RotateCcw size={17} /> Try again
-        </button>
+        </div>
       </div>
     );
+  }
 
+  // Main review flow - question exists here
   const correct = selectedAnswer === question.correct_answer;
   const next = () => {
     if (correct) setScore((current) => current + 1);
