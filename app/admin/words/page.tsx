@@ -52,6 +52,9 @@ export default function AdminWordsPage() {
   const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Export state
+  const [exporting, setExporting] = useState(false);
+
   // Toast notifications
   const { push: toast } = useToasts();
 
@@ -568,22 +571,37 @@ const onWordUpdate = async (data: WordFormData) => {
             <Button
               variant="outline"
               type="button"
-              onClick={() => {
-                const headers = ['Chinese', 'Pinyin', 'Khmer', 'English', 'HSK Level', 'Class'];
-                const data = filteredWords.map(w => ({
-                  Chinese: w.chinese,
-                  Pinyin: w.pinyin || '',
-                  Khmer: w.khmer || '',
-                  English: w.english || '',
-                  'HSK Level': w.hsk?.replace('HSK ', '') || '',
-                  Class: w.className || '',
-                }));
-                exportToExcel(data, headers, `words-export-${new Date().toISOString().split('T')[0]}.xlsx`);
-                toast({ title: 'Exported', message: `Downloaded ${filteredWords.length} words as Excel (Khmer supported)` });
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  const headers = ['Chinese', 'Pinyin', 'Khmer', 'English', 'HSK Level', 'Class'];
+                  const data = filteredWords.map(w => ({
+                    Chinese: w.chinese,
+                    Pinyin: w.pinyin || '',
+                    Khmer: w.khmer || '',
+                    English: w.english || '',
+                    'HSK Level': w.hsk?.replace('HSK ', '') || '',
+                    Class: w.className || '',
+                  }));
+                  exportToExcel(data, headers, `words-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+                  toast({ title: 'Exported', message: `Downloaded ${filteredWords.length} words as Excel (Khmer supported)` });
+                } finally {
+                  setExporting(false);
+                }
               }}
             >
-              <Download size={17} />
-              <span>Export Excel</span>
+              {exporting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin mr-2" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download size={17} />
+                  <span>Export Excel</span>
+                </>
+              )}
             </Button>
             <Button
               variant="primary"
