@@ -108,7 +108,9 @@ export function exportToCSV(data: any[], headers: string[]): string {
   
   const headerRow = headers.map(escapeCell).join(',');
   const rows = data.map(row => headers.map(h => escapeCell(row[h])).join(','));
-  return [headerRow, ...rows].join('\n');
+  const csv = [headerRow, ...rows].join('\n');
+  // Add UTF-8 BOM for proper Khmer/Unicode support in Excel
+  return '\uFEFF' + csv;
 }
 
 export function exportToExcel(data: any[], headers: string[], filename: string): void {
