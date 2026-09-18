@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     const ids = data.users.map((user) => user.id);
     const { data: profiles, error: profilesError } = ids.length
-      ? await access.adminClient.from('profiles').select('id, role, full_name').in('id', ids)
+      ? await access.adminClient.from('profiles').select('id, role, full_name, last_active_at, is_online').in('id', ids)
       : { data: [], error: null };
     if (profilesError) return NextResponse.json({ error: profilesError.message }, { status: 500 });
     const profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
@@ -82,6 +82,8 @@ export async function GET(request: NextRequest) {
         role: profilesById.get(user.id)?.role ?? 'student',
         createdAt: user.created_at,
         lastSignInAt: user.last_sign_in_at ?? null,
+        lastActiveAt: profilesById.get(user.id)?.last_active_at ?? null,
+        isOnline: profilesById.get(user.id)?.is_online ?? false,
         emailConfirmed: Boolean(user.email_confirmed_at),
         disabled: Boolean(user.banned_until && new Date(user.banned_until) > new Date()),
       })),

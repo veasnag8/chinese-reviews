@@ -134,6 +134,48 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // User activity tracking
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+
+    let active = true;
+
+    const updateActivity = async () => {
+      if (!active) return;
+      try {
+        await client.rpc('update_user_activity');
+      } catch {
+        // Silently fail
+      }
+    };
+
+    const setOffline = async () => {
+      if (!active) return;
+      try {
+        await client.rpc('set_user_offline');
+      } catch {
+        // Silently fail
+      }
+    };
+
+    // Mark online on mount and focus
+    void updateActivity();
+    const onFocus = () => { void updateActivity(); };
+    window.addEventListener('focus', onFocus);
+
+    // Mark offline on unload
+    const onBeforeUnload = () => { void setOffline(); };
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    return () => {
+      active = false;
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      void setOffline();
+    };
+  }, []);
+
   const logout = async () => {
     await supabase?.auth.signOut();
     router.push('/login');
