@@ -179,7 +179,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return <div className="min-h-screen bg-[#f7f6f3] text-slate-900">
     <aside className="fixed inset-y-0 hidden w-64 border-r border-stone-200 bg-white px-4 py-6 md:flex md:flex-col">
       <Link href="/dashboard" className="mb-9 flex items-center gap-3 px-2"><span className="grid size-9 place-items-center rounded-xl bg-[#b91c1c] text-lg text-white">汉</span><span className="font-semibold tracking-wide">CHINESE REVIEW</span></Link>
-      <nav className="space-y-1">{navigation.map(({ href, label, icon: Icon, admin }) => <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{label}{(href === '/quizzes' && quizCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{quizCount}</span>}{(href === '/review' && dailyReviewCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{dailyReviewCount}</span>}</Link>)}</nav>
+      <nav className="space-y-1">{navigation.map(({ href, label, icon: Icon, admin }) => <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && isStaffLoaded && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{label}{(href === '/quizzes' && quizCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{quizCount}</span>}{(href === '/review' && dailyReviewCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{dailyReviewCount}</span>}</Link>)}</nav>
       <div className="mt-auto rounded-2xl bg-[#fff8e8] p-4"><Sparkles size={18} className="mb-2 text-amber-500"/><p className="text-sm font-semibold">Keep your streak alive</p><p className="mt-1 text-xs text-slate-500">A little review today goes a long way.</p></div>
     </aside>
     <main className="pb-24 md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6 md:p-8">{children}</div></main>
@@ -227,7 +227,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <nav className="space-y-2">
             {overflowItems.map(({ href, label, icon: Icon, admin }) => (
-              !admin || isStaff ? (
+              !admin || (isStaffLoaded && isStaff) ? (
                 <Link
                   key={href}
                   href={href}
