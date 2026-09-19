@@ -35,7 +35,6 @@ export default function AdminWordsPage() {
   const [user, setUser] = useState<string | null>(null);
   const [access, setAccess] = useState<"checking" | "allowed" | "denied">("checking");
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
   const [words, setWords] = useState<any[]>([]);
   const [formState, setFormState] = useState<
     "idle" | "submitting" | "success" | "error"
@@ -87,7 +86,6 @@ export default function AdminWordsPage() {
 
     const role = (profile as { role?: string } | null)?.role;
     setIsAdmin(role === "admin");
-    setIsStaff(role === "admin" || role === "teacher");
     setAccess(
       role === "admin" || role === "teacher" ? "allowed" : "denied"
     );
@@ -843,7 +841,7 @@ const onWordUpdate = async (data: WordFormData) => {
                       </td>
 
                       <td className="p-3 flex gap-2">
-                        {isStaff ? (
+                        {isAdmin ? (
                           <>
                             <Button
                               size="sm"
@@ -889,7 +887,7 @@ reset({
                           </>
                         ) : (
                           <span className="text-xs text-muted-foreground">
-                            Staff only
+                            Admin only
                           </span>
                         )}
                       </td>

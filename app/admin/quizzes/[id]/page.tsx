@@ -31,7 +31,7 @@ const formatDate = (value?: string) => {
 export default function ViewQuizPage() {
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === 'string' ? params.id : '';
-  const { status, isStaff } = useRole();
+  const { status } = useRole();
 
   const [quiz, setQuiz] = useState<QuizDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,14 +87,12 @@ export default function ViewQuizPage() {
           >
             <BarChart3 size={15} /> View Results
           </Link>
-          {isStaff && (
-            <Link
-              href={`/admin/quizzes/${id}/edit`}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              <Pencil size={15} /> Edit Quiz
-            </Link>
-          )}
+          <Link
+            href={`/admin/quizzes/${id}/edit`}
+            className="inline-flex items-center gap-1 rounded-lg bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            <Pencil size={15} /> Edit Quiz
+          </Link>
         </div>
       </div>
 

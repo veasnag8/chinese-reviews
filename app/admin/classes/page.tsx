@@ -15,7 +15,7 @@ type LessonClass = {
 };
 
 export default function AdminClassesPage() {
-  const { status, isStaff } = useRole();
+  const { status, isAdmin } = useRole();
   const [classes, setClasses] = useState<LessonClass[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', teacher: '', lessonNumber: '', date: new Date().toISOString().slice(0, 10) });
@@ -37,7 +37,7 @@ export default function AdminClassesPage() {
   };
 
   const editClass = (item: LessonClass) => {
-    if (!isStaff || busy) return;
+    if (!isAdmin || busy) return;
     setEditingId(item.id);
     setMessage('');
     setForm({ name: item.name, description: item.description || '', teacher: item.teacher || '', lessonNumber: item.lesson_number === null ? '' : String(item.lesson_number), date: item.date });
@@ -46,7 +46,7 @@ export default function AdminClassesPage() {
 
   const saveClass = async (event: FormEvent) => {
     event.preventDefault();
-    if (!supabase || busy || status !== 'allowed' || (editingId && !isStaff)) return;
+    if (!supabase || busy || status !== 'allowed' || (editingId && !isAdmin)) return;
     if (!form.name.trim()) {
       setMessage('Class name is required.');
       return;
@@ -83,7 +83,7 @@ export default function AdminClassesPage() {
   };
 
   const deleteClass = async (item: LessonClass) => {
-    if (!supabase || !isStaff || busy) return;
+    if (!supabase || !isAdmin || busy) return;
     if (!window.confirm(`Delete “${item.name}”? This also deletes its words and sentences and their related records. This cannot be undone.`)) return;
     setBusy(true);
     setMessage('');
@@ -123,7 +123,7 @@ export default function AdminClassesPage() {
           {editingId && <button type="button" onClick={resetForm} disabled={busy} className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-50">Cancel</button>}
         </div>
       </form>
-      <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white"><table className="w-full min-w-[700px] text-left text-sm"><thead className="border-b border-stone-200 bg-stone-50"><tr><th className="p-4">Date</th><th className="p-4">Class</th><th className="p-4">Lesson</th><th className="p-4">Teacher</th><th className="p-4">What to learn</th><th className="p-4">Action</th></tr></thead><tbody>{classes.map((item) => <tr key={item.id} className="border-b border-stone-100"><td className="p-4">{item.date}</td><td className="p-4 font-semibold">{item.name}</td><td className="p-4">{item.lesson_number || '—'}</td><td className="p-4">{item.teacher || '—'}</td><td className="p-4 text-slate-600">{item.description || '—'}</td><td className="p-4">{isStaff && <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => editClass(item)} className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50"><Pencil size={13} /> Edit</button><button type="button" disabled={busy} onClick={() => deleteClass(item)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50"><Trash2 size={13} /> Delete</button></div>}</td></tr>)}{classes.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No lesson schedules yet.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white"><table className="w-full min-w-[700px] text-left text-sm"><thead className="border-b border-stone-200 bg-stone-50"><tr><th className="p-4">Date</th><th className="p-4">Class</th><th className="p-4">Lesson</th><th className="p-4">Teacher</th><th className="p-4">What to learn</th><th className="p-4">Action</th></tr></thead><tbody>{classes.map((item) => <tr key={item.id} className="border-b border-stone-100"><td className="p-4">{item.date}</td><td className="p-4 font-semibold">{item.name}</td><td className="p-4">{item.lesson_number || '—'}</td><td className="p-4">{item.teacher || '—'}</td><td className="p-4 text-slate-600">{item.description || '—'}</td><td className="p-4">{isAdmin && <div className="flex gap-2"><button type="button" disabled={busy} onClick={() => editClass(item)} className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50"><Pencil size={13} /> Edit</button><button type="button" disabled={busy} onClick={() => deleteClass(item)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50"><Trash2 size={13} /> Delete</button></div>}</td></tr>)}{classes.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No lesson schedules yet.</td></tr>}</tbody></table></div>
     </div>
   );
 }

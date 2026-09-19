@@ -30,7 +30,7 @@ const formatDate = (value: string) => {
 };
 
 export default function AdminQuizzesPage() {
-  const { status, isAdmin, isStaff } = useRole();
+  const { status, isAdmin } = useRole();
 
   const [quizzes, setQuizzes] = useState<QuizSummary[]>([]);
   const [search, setSearch] = useState('');
@@ -231,7 +231,7 @@ export default function AdminQuizzesPage() {
                         >
                           <BarChart3 size={13} /> Results
                         </Link>
-                        {isStaff && (
+                        {isAdmin && (
                           <Link
                             href={`/admin/quizzes/${quiz.id}/edit`}
                             className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700"
@@ -239,7 +239,7 @@ export default function AdminQuizzesPage() {
                             <Pencil size={13} /> Edit
                           </Link>
                         )}
-                        {isStaff && (
+                        {isAdmin && (
                           <button
                             type="button"
                             onClick={() => setPendingDelete(quiz)}
@@ -309,7 +309,7 @@ export default function AdminQuizzesPage() {
                   >
                     <BarChart3 size={13} /> Results
                   </Link>
-                  {isStaff && (
+                  {isAdmin && (
                     <Link
                       href={`/admin/quizzes/${quiz.id}/edit`}
                       className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold text-slate-700"
@@ -317,7 +317,7 @@ export default function AdminQuizzesPage() {
                       <Pencil size={13} /> Edit
                     </Link>
                   )}
-                  {isStaff && (
+                  {isAdmin && (
                     <button
                       type="button"
                       onClick={() => setPendingDelete(quiz)}

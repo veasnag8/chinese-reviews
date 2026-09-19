@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase';
 export type RoleState = {
   status: 'checking' | 'denied' | 'allowed';
   isAdmin: boolean;
-  isStaff: boolean;
   userId: string | null;
 };
 
@@ -14,7 +13,6 @@ export function useRole(): RoleState {
   const [state, setState] = useState<RoleState>({
     status: 'checking',
     isAdmin: false,
-    isStaff: false,
     userId: null,
   });
 
@@ -23,7 +21,7 @@ export function useRole(): RoleState {
 
     const run = async () => {
       if (!supabase) {
-        if (active) setState({ status: 'denied', isAdmin: false, isStaff: false, userId: null });
+        if (active) setState({ status: 'denied', isAdmin: false, userId: null });
         return;
       }
 
@@ -32,7 +30,7 @@ export function useRole(): RoleState {
       if (!active) return;
 
       if (!data.user) {
-        setState({ status: 'denied', isAdmin: false, isStaff: false, userId: null });
+        setState({ status: 'denied', isAdmin: false, userId: null });
         return;
       }
 
@@ -48,7 +46,6 @@ export function useRole(): RoleState {
       setState({
         status: role === 'admin' || role === 'teacher' ? 'allowed' : 'denied',
         isAdmin: role === 'admin',
-        isStaff: role === 'admin' || role === 'teacher',
         userId: data.user.id,
       });
     };

@@ -9,14 +9,14 @@ import { fetchQuizDetail, type QuizDetail } from '@/lib/quizzes';
 export default function EditQuizPage() {
   const params = useParams<{ id: string }>();
   const id = typeof params?.id === 'string' ? params.id : '';
-  const { status, isStaff, userId } = useRole();
+  const { status, isAdmin, userId } = useRole();
 
   const [quiz, setQuiz] = useState<QuizDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    if (status !== 'allowed' || !isStaff || !id) return;
+    if (status !== 'allowed' || !isAdmin || !id) return;
 
     let active = true;
 
@@ -43,17 +43,17 @@ export default function EditQuizPage() {
     return () => {
       active = false;
     };
-  }, [status, isStaff, id]);
+  }, [status, isAdmin, id]);
 
   if (status === 'checking') {
     return <p className="p-6 text-slate-500">Loading quiz...</p>;
   }
 
-  if (status === 'denied' || !isStaff) {
+  if (status === 'denied' || !isAdmin) {
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
         <h1 className="text-xl font-bold">Edit Quiz</h1>
-        <p className="mt-2 text-slate-500">Only teachers and admins can edit quizzes.</p>
+        <p className="mt-2 text-slate-500">Only admins can edit quizzes.</p>
       </div>
     );
   }

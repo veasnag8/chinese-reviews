@@ -40,7 +40,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const protectedPaths = ['/dashboard', '/words', '/sentences', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes', '/admin'];
+  const protectedPaths = ['/dashboard', '/words', '/sentences', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes'];
   const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path));
   
   // Allow login and register pages without auth
