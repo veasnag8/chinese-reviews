@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
-import { OnlineUsersPanel } from "@/components/admin/online-users";
 
 export default function AdminDashboardPage() {
   const [user, setUser] = useState<string | null>(null);
@@ -128,11 +127,6 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
         
-        {/* Online Admin Users */}
-        <Card className="p-6 lg:col-span-3">
-          <OnlineUsersPanel />
-        </Card>
-
         {/* Recent Activity */}
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Recent Activity</h3>

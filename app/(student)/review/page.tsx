@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, RotateCcw, Trophy, X, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
+import { Check, RotateCcw, Trophy, X, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { meaningFromWord, pickSimilarDistractors, shuffleChoices, type QuizMeaning } from '@/lib/quiz/distractors';
 
@@ -33,14 +33,7 @@ type WordRow = {
   classes?: { date?: string | null } | null;
 };
 
-function generateId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-function ReviewPageContent() {
+export default function ReviewPage() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [wordPool, setWordPool] = useState<QuizMeaning[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,114 +46,81 @@ function ReviewPageContent() {
   const [completeError, setCompleteError] = useState('');
   const [reviewCompletedToday, setReviewCompletedToday] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const checkReviewStatus = async () => {
+      if (!supabase) return;
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) return;
+      
+      const { data } = await supabase.rpc('has_completed_daily_review');
+      setReviewCompletedToday(data === true);
+    };
+    checkReviewStatus();
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
-    
-    const checkReviewStatus = async () => {
-      if (!supabase) {
-        setError('Supabase client not configured. Please check environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY).');
-        setLoading(false);
-        return;
-      }
-      try {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError) throw authError;
-        if (!authData.user) {
-          setError('Please sign in to access review.');
-          return;
-        }
-        
-        const { data, error: rpcError } = await supabase.rpc('has_completed_daily_review');
-        if (rpcError) throw rpcError;
-        setReviewCompletedToday(data === true);
-      } catch (err) {
-        console.error('Error checking review status:', err);
-        setError('Failed to load review status. The daily review function may not be set up in the database.');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    checkReviewStatus();
-  }, [mounted]);
-
-  useEffect(() => {
-    if (!mounted || error) return;
-    
     const loadQuestions = async () => {
       if (!supabase) {
-        setError('Supabase client not configured. Please check environment variables.');
         setLoading(false);
         return;
       }
 
-      try {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const dateStr = sevenDaysAgo.toISOString().split('T')[0];
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const dateStr = sevenDaysAgo.toISOString().split('T')[0];
 
-        const { data: wordsData, error: wordsError } = await supabase
+      const [wordsResult] = await Promise.all([
+        supabase
           .from('words')
           .select('chinese, pinyin, khmer, english, category, class_id, created_at, classes!words_class_id_fkey (date)')
           .gte('created_at', dateStr)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false }),
+      ]);
 
-        if (wordsError) throw wordsError;
-
-        const wordRows = ((wordsData || []) as WordRow[])
-          .filter((word) => word.chinese)
-          .map((word) => ({
-            chinese: word.chinese,
-            answer: (word.khmer || word.english || word.pinyin || '').trim(),
-            pinyin: word.pinyin,
-            khmer: word.khmer,
-            english: word.english,
-            category: word.category,
-            class_id: word.class_id,
-          }))
-          .filter((item) => item.answer);
-
-        if (wordRows.length < 2) {
-          setWordPool([]);
-          setLoading(false);
-          return;
-        }
-
-        const shuffled = [...wordRows].sort(() => Math.random() - 0.5).slice(0, 10);
-        const generatedQuestions = shuffled.map((word) => ({
-          id: generateId(),
+      const wordRows = ((wordsResult.data || []) as WordRow[])
+        .filter((word) => word.chinese)
+        .map((word) => ({
           chinese: word.chinese,
-          correct_answer: word.answer,
+          answer: (word.khmer || word.english || word.pinyin || '').trim(),
           pinyin: word.pinyin,
           khmer: word.khmer,
           english: word.english,
+          category: word.category,
           class_id: word.class_id,
-        }));
+        }))
+        .filter((item) => item.answer);
 
-        setQuestions(generatedQuestions);
-        setWordPool(
-          shuffled.map((word) => ({
-            chinese: word.chinese,
-            answer: word.answer,
-            pinyin: word.pinyin,
-            khmer: word.khmer,
-            english: word.english,
-            category: word.category,
-            class_id: word.class_id,
-          }))
-        );
-      } catch (err) {
-        console.error('Error loading questions:', err);
-        setError('Failed to load review questions. Please add more words or try again later.');
-      } finally {
+      if (wordRows.length < 2) {
+        setWordPool([]);
         setLoading(false);
+        return;
       }
+
+      const shuffled = [...wordRows].sort(() => Math.random() - 0.5).slice(0, 10);
+      const generatedQuestions = shuffled.map((word) => ({
+        id: crypto.randomUUID(),
+        chinese: word.chinese,
+        correct_answer: word.answer,
+        pinyin: word.pinyin,
+        khmer: word.khmer,
+        english: word.english,
+        class_id: word.class_id,
+      }));
+
+      setQuestions(generatedQuestions);
+      setWordPool(
+        shuffled.map((word) => ({
+          chinese: word.chinese,
+          answer: word.answer,
+          pinyin: word.pinyin,
+          khmer: word.khmer,
+          english: word.english,
+          category: word.category,
+          class_id: word.class_id,
+        }))
+      );
+      setLoading(false);
     };
 
     loadQuestions();
@@ -222,17 +182,6 @@ function ReviewPageContent() {
   };
 
   if (loading) return <p className="text-slate-500">Loading review...</p>;
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-xl rounded-3xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
-        <AlertCircle className="mx-auto text-red-500" size={42} />
-        <p className="mt-4 text-sm font-semibold tracking-wider text-red-700">Unable to Load Review</p>
-        <p className="mt-2 text-red-600">{error}</p>
-        <p className="mt-2 text-sm text-red-500">Please ensure Supabase environment variables are configured in Vercel.</p>
-      </div>
-    );
-  }
 
   // Show completed message if already done today
   if (reviewCompletedToday && !showResults && !completed) {
@@ -396,45 +345,3 @@ function ReviewPageContent() {
     </div>
   );
 }
-
-function ReviewPage() {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  
-  if (!mounted) {
-    return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Daily Review</p>
-            <h1 className="mt-1 text-3xl font-bold">Test your Chinese (Last 7 Days)</h1>
-          </div>
-          <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
-            Loading...
-          </span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-stone-200">
-          <div className="h-full bg-[#b91c1c] animate-pulse" style={{ width: '50%' }} />
-        </div>
-        <div className="rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm sm:p-10">
-          <div className="space-y-4">
-            <div className="h-10 bg-stone-100 rounded animate-pulse" />
-            <div className="grid gap-3 text-left">
-              <div className="h-12 bg-stone-100 rounded animate-pulse" />
-              <div className="h-12 bg-stone-100 rounded animate-pulse" />
-              <div className="h-12 bg-stone-100 rounded animate-pulse" />
-              <div className="h-12 bg-stone-100 rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  return <ReviewPageContent />;
-}
-
-export default ReviewPage;

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, Wifi, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -21,7 +21,6 @@ const navigation = [
   { href: '/favorites', label: 'Favorites', icon: Heart, admin: false },
   { href: '/progress', label: 'Progress', icon: ChartNoAxesColumnIncreasing, admin: false },
   { href: '/admin/users', label: 'User List', icon: Users, admin: true },
-  { href: '/admin/online-users', label: 'Online Users', icon: Wifi, admin: true },
   { href: '/settings', label: 'Settings', icon: Settings, admin: false },
 ];
 
@@ -53,7 +52,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: '/admin/words', label: 'Words List', icon: List, admin: true },
     { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList, admin: true },
     { href: '/admin/users', label: 'User List', icon: Users, admin: true },
-    { href: '/admin/online-users', label: 'Online Users', icon: Wifi, admin: true },
   ];
 
   const overflowNotificationCount = quizCount + dailyReviewCount;

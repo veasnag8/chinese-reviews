@@ -663,38 +663,6 @@ export interface Database {
         Args: { p_quiz_id: string };
         Returns: boolean;
       };
-      has_completed_daily_review: {
-        Args: Record<string, never>;
-        Returns: boolean;
-      };
-      complete_daily_review: {
-        Args: Record<string, never>;
-        Returns: void;
-      };
-      is_review_day: {
-        Args: Record<string, never>;
-        Returns: boolean;
-      };
-      update_user_activity: {
-        Args: Record<string, never>;
-        Returns: void;
-      };
-      set_user_offline: {
-        Args: Record<string, never>;
-        Returns: void;
-      };
-      get_all_users_with_activity: {
-        Args: Record<string, never>;
-        Returns: {
-          id: string;
-          email: string;
-          full_name: string | null;
-          role: string;
-          last_active_at: string | null;
-          is_online: boolean;
-          created_at: string;
-        }[];
-      };
     };
     Enums: {
       [key: string]: string[];
