@@ -120,7 +120,10 @@ function LoginForm() {
               </button>
             </form>
             <p className="mt-7 text-center text-sm text-slate-500">
-              Need an account? Ask your teacher or admin to create one for you.
+              Need an account?{" "}
+              <a href="/register" className="font-semibold text-[#b91c1c] hover:underline">
+                Create one
+              </a>
             </p>
           </div>
         </section>
