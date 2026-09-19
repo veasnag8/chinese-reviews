@@ -55,7 +55,7 @@ async function requireAdmin(request: NextRequest) {
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  if (profileError || profile?.role !== 'admin') return null;
+  if (profileError || !['admin', 'teacher'].includes(profile?.role ?? '')) return null;
   return { adminClient, userId: authData.user.id };
 }
 
