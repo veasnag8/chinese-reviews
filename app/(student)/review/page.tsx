@@ -264,8 +264,8 @@ export default function ReviewPage() {
         </div>
 
         <div className="mt-6 flex justify-center gap-3">
-          <button onClick={restart} className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white">
-            <Check size={17} /> Today Completed
+          <button onClick={restart} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">
+            <RotateCcw size={17} /> Try again
           </button>
         </div>
       </div>
@@ -281,16 +281,6 @@ export default function ReviewPage() {
     setSelectedAnswer('');
     setChecked(false);
   };
-
-  // Auto-advance when answer selected (no "Check answer" step)
-  useEffect(() => {
-    if (selectedAnswer && !checked) {
-      setChecked(true);
-      const isCorrect = selectedAnswer === question.correct_answer;
-      if (isCorrect) setScore((current) => current + 1);
-      setAnswers((current) => [...current, { question_id: question.id, selected_answer: selectedAnswer, is_correct: isCorrect }]);
-    }
-  }, [selectedAnswer]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -339,7 +329,11 @@ export default function ReviewPage() {
             <button onClick={next} className="rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white">
               Next question
             </button>
-          ) : null}
+          ) : (
+            <button disabled={!selectedAnswer} onClick={() => setChecked(true)} className="rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white disabled:opacity-40">
+              Check answer
+            </button>
+          )}
         </div>
       </section>
     </div>
