@@ -2,7 +2,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowRight, BookOpen, CheckCircle2, Flame, GraduationCap, Repeat2, Trophy } from 'lucide-react';
-import { initialClasses, initialSentences, initialWords } from '@/lib/demo-data';
 import { supabase } from '@/lib/supabase';
 
 const stat = (label: string, value: string, icon: React.ReactNode, tone: string) => (
@@ -39,10 +38,34 @@ function resolveName(
   return (profileName || metadataName || fromEmail || 'there').trim();
 }
 
+interface DashboardStats {
+  wordsCount: number;
+  sentencesCount: number;
+  masteredCount: number;
+  accuracy: number;
+  dueCount: number;
+  recentClasses: Array<{
+    id: string;
+    name: string;
+    date: string;
+    teacher: string | null;
+    words: number;
+    sentences: number;
+  }>;
+}
+
 export default function DashboardPage() {
-  const due = initialWords.filter((x) => x.due).length + initialSentences.filter((x) => x.due).length;
   const [fullName, setFullName] = useState('');
   const [now, setNow] = useState<Date | null>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    wordsCount: 0,
+    sentencesCount: 0,
+    masteredCount: 0,
+    accuracy: 0,
+    dueCount: 0,
+    recentClasses: [],
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -52,12 +75,16 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
 
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
         setFullName('');
+        setLoading(false);
         return;
       }
 
@@ -70,6 +97,68 @@ export default function DashboardPage() {
         .maybeSingle();
 
       setFullName(resolveName((profile as { full_name?: string } | null)?.full_name, data.user.user_metadata, data.user.email));
+      await loadStats(data.user.id);
+    };
+
+    const loadStats = async (userId: string) => {
+      try {
+        const [wordsRes, sentencesRes, reviewItemsRes, reviewHistoryRes, classesRes] = await Promise.all([
+          supabase.from('words').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('review_items').select('id, correct_count, review_count, difficulty').eq('user_id', userId),
+          supabase.from('review_history').select('correct').eq('user_id', userId),
+          supabase
+            .from('classes')
+            .select('id, name, date, teacher, lesson_number')
+            .eq('user_id', userId)
+            .order('date', { ascending: false })
+            .limit(5),
+        ]);
+
+        const wordsCount = wordsRes.count || 0;
+        const sentencesCount = sentencesRes.count || 0;
+
+        const reviewItems = reviewItemsRes.data || [];
+        const masteredCount = reviewItems.filter((item) => item.difficulty === 'easy' && item.review_count >= 3).length;
+
+        const reviewHistory = reviewHistoryRes.data || [];
+        const totalReviews = reviewHistory.length;
+        const correctReviews = reviewHistory.filter((h) => h.correct).length;
+        const accuracy = totalReviews > 0 ? Math.round((correctReviews / totalReviews) * 100) : 0;
+
+        const dueCount = reviewItems.filter((item) => new Date(item.due_date) <= new Date()).length;
+
+        const classes = classesRes.data || [];
+        const classesWithCounts = await Promise.all(
+          classes.map(async (c) => {
+            const [wordsCnt, sentencesCnt] = await Promise.all([
+              supabase.from('words').select('id', { count: 'exact', head: true }).eq('class_id', c.id).eq('user_id', userId),
+              supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('class_id', c.id).eq('user_id', userId),
+            ]);
+            return {
+              id: c.id,
+              name: c.name,
+              date: c.date,
+              teacher: c.teacher,
+              words: wordsCnt.count || 0,
+              sentences: sentencesCnt.count || 0,
+            };
+          })
+        );
+
+        setStats({
+          wordsCount,
+          sentencesCount,
+          masteredCount,
+          accuracy,
+          dueCount,
+          recentClasses: classesWithCounts,
+        });
+      } catch {
+        // Silently handle errors, keep defaults
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadUser();
@@ -81,6 +170,10 @@ export default function DashboardPage() {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  if (loading) {
+    return <div className="space-y-7">Loading...</div>;
+  }
 
   return (
     <div className="space-y-7">
@@ -109,7 +202,7 @@ export default function DashboardPage() {
               <Repeat2 />
             </div>
             <p className="text-sm font-semibold tracking-wide text-red-100">TODAY&apos;S REVIEW</p>
-            <h2 className="mt-2 text-3xl font-bold">{due} items ready</h2>
+            <h2 className="mt-2 text-3xl font-bold">{stats.dueCount} items ready</h2>
             <p className="mt-2 max-w-md text-red-100">
               Keep the words from your recent classes fresh with a short, focused session.
             </p>
@@ -128,10 +221,10 @@ export default function DashboardPage() {
         </div>
       </section>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stat('Words learned', String(initialWords.length), <BookOpen size={18} />, 'bg-red-50 text-[#b91c1c]')}
-        {stat('Sentences learned', String(initialSentences.length), <GraduationCap size={18} />, 'bg-blue-50 text-blue-700')}
-        {stat('Mastered', '3', <Trophy size={18} />, 'bg-amber-50 text-amber-600')}
-        {stat('Accuracy', '87%', <CheckCircle2 size={18} />, 'bg-emerald-50 text-emerald-600')}
+        {stat('Words learned', String(stats.wordsCount), <BookOpen size={18} />, 'bg-red-50 text-[#b91c1c]')}
+        {stat('Sentences learned', String(stats.sentencesCount), <GraduationCap size={18} />, 'bg-blue-50 text-blue-700')}
+        {stat('Mastered', String(stats.masteredCount), <Trophy size={18} />, 'bg-amber-50 text-amber-600')}
+        {stat('Accuracy', `${stats.accuracy}%`, <CheckCircle2 size={18} />, 'bg-emerald-50 text-emerald-600')}
       </section>
       <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -142,17 +235,21 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-1">
-            {initialClasses.map((c) => (
-              <Link href="/classes" key={c.id} className="flex items-center justify-between rounded-xl p-3 hover:bg-stone-50">
-                <div>
-                  <p className="font-semibold">{c.name}</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {new Date(c.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-                <p className="text-sm text-slate-500">{c.words + c.sentences} items</p>
-              </Link>
-            ))}
+            {stats.recentClasses.length > 0 ? (
+              stats.recentClasses.map((c) => (
+                <Link href="/classes" key={c.id} className="flex items-center justify-between rounded-xl p-3 hover:bg-stone-50">
+                  <div>
+                    <p className="font-semibold">{c.name}</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {new Date(c.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <p className="text-sm text-slate-500">{c.words + c.sentences} items</p>
+                </Link>
+              ))
+            ) : (
+              <p className="p-4 text-center text-slate-500">No classes yet. Add words to create your first class.</p>
+            )}
           </div>
         </div>
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
