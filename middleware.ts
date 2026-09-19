@@ -31,9 +31,6 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-<<<<<<< Updated upstream
-  const protectedPaths = ['/dashboard', '/words', '/sentences', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes'];
-=======
   let userExists = false;
   if (user) {
     const { data: profile } = await supabase
@@ -45,18 +42,14 @@ export async function middleware(request: NextRequest) {
   }
 
   const protectedPaths = ['/dashboard', '/words', '/sentences', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes', '/admin'];
->>>>>>> Stashed changes
   const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path));
   
   // Allow login and register pages without auth
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/register');
 
-<<<<<<< Updated upstream
-  if (isProtectedPath && !user && !isAuthPage) {
-=======
   if (isProtectedPath && (!user || !userExists) && !isAuthPage) {
     // If env vars not configured, don't redirect to login (it won't work either)
-    if (!supabaseUrl || !supabaseKey) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
       return supabaseResponse;
     }
     
@@ -65,7 +58,6 @@ export async function middleware(request: NextRequest) {
       await supabase.auth.signOut();
     }
     
->>>>>>> Stashed changes
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirect', request.nextUrl.pathname);
