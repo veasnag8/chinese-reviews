@@ -60,6 +60,12 @@ export default function ReviewPage() {
   }, []);
 
   useEffect(() => {
+    // Don't load questions if review already completed today
+    if (reviewCompletedToday) {
+      setLoading(false);
+      return;
+    }
+
     const loadQuestions = async () => {
       if (!supabase) {
         setLoading(false);
@@ -124,7 +130,7 @@ export default function ReviewPage() {
     };
 
     loadQuestions();
-  }, []);
+  }, [reviewCompletedToday]);
 
   const quizQuestions = useMemo(
     () =>
