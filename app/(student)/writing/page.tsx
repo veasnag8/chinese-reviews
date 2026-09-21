@@ -39,10 +39,13 @@ function WritingPage() {
   const [searchResults, setSearchResults] = useState<StudyWord[]>([]);
   const [searching, setSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [charIndex, setCharIndex] = useState(0);
 
   const word = words[wordIndex] ?? words[0] ?? initialWords[0];
-  const character = [...word.chinese][0];
+  const characters = [...word.chinese];
+  const character = characters[charIndex];
   const isSingleMode = singleMode && wordParam;
+  const isLastChar = charIndex === characters.length - 1;
 
   useEffect(() => {
     const loadWords = async () => {
@@ -76,6 +79,7 @@ function WritingPage() {
       const requested = wordParam;
       const index = requested ? mapped.findIndex((item) => item.id === requested) : 0;
       setWordIndex(index >= 0 ? index : 0);
+      setCharIndex(0);
     };
 
     loadWords();
@@ -135,6 +139,7 @@ function WritingPage() {
       setWords((current) => [selectedWord, ...current]);
       setWordIndex(0);
     }
+    setCharIndex(0);
     setSearchQuery('');
     setShowSearchResults(false);
     searchInputRef.current?.blur();
@@ -192,7 +197,7 @@ function WritingPage() {
         if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
         popupTimerRef.current = setTimeout(() => setShowCorrectPopup(false), 1000);
       },
-      onComplete: () => setComplete(true),
+      onComplete: () => nextChar(),
     });
 
     writerRef.current = writer;
@@ -214,7 +219,7 @@ function WritingPage() {
       if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
       writerRef.current = null;
     };
-  }, [character]);
+  }, [character, charIndex]);
 
   useEffect(() => {
     const writer = writerRef.current;
@@ -235,8 +240,29 @@ function WritingPage() {
     writer.cancelQuiz();
     writer.animateCharacter().then(() => writer.quiz());
     setStrokeCount(0);
+    setTotalStrokes(0);
+    setStrokePaths([]);
     setComplete(false);
     setShowCorrectPopup(false);
+    HanziWriter.loadCharacterData(character).then((data) => {
+      if (data) {
+        setStrokePaths(data.strokes);
+        setTotalStrokes(data.strokes.length);
+      }
+    });
+  };
+
+  const nextChar = () => {
+    if (isLastChar) {
+      setComplete(true);
+    } else {
+      setCharIndex(charIndex + 1);
+      setStrokeCount(0);
+      setTotalStrokes(0);
+      setStrokePaths([]);
+      setComplete(false);
+      setShowCorrectPopup(false);
+    }
   };
 
   const next = () => setWordIndex((index) => (index + 1) % words.length);
@@ -326,12 +352,27 @@ function WritingPage() {
 
       <div className="mt-6 flex items-center justify-between text-sm">
         <span className="font-semibold text-slate-700">
+          Character {charIndex + 1} of {characters.length} &nbsp;|&nbsp;
           Stroke {complete ? totalStrokes : Math.min(strokeCount + 1, totalStrokes || 1)} / {totalStrokes || '...'}
         </span>
         <span className="text-slate-500">{complete ? 'Character complete' : 'Trace the highlighted stroke'}</span>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      {/* Character progress indicators */}
+      <div className="mt-3 flex items-center justify-center gap-2">
+        {characters.map((c, idx) => (
+          <span
+            key={idx}
+            className={`text-3xl font-bold transition-colors ${
+              idx < charIndex ? 'text-emerald-600' : idx === charIndex ? 'text-[#b91c1c]' : 'text-stone-300'
+            }`}
+          >
+            {c}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2 justify-center">
         {Array.from({ length: totalStrokes || strokePaths.length || 1 }, (_, index) => index + 1).map((step) => {
           const done = step <= strokeCount;
           const active = step === strokeCount + 1 && !complete;
@@ -349,6 +390,13 @@ function WritingPage() {
             </span>
           );
         })}
+      </div>
+
+      {/* Current character display */}
+      <div className="mt-4 text-center">
+        <p className="text-sm text-slate-500">Current character:</p>
+        <p className="mt-1 text-5xl font-bold text-[#b91c1c] tracking-wide">{character}</p>
+        <p className="text-sm text-slate-500">{word.pinyin}</p>
       </div>
 
       <div className="mt-6 rounded-[20px] border border-sky-200 bg-[#f5f9fc] p-3 shadow-[0_12px_32px_rgba(75,132,171,0.08)]">
@@ -409,14 +457,27 @@ function WritingPage() {
             <ArrowLeft size={16} /> Back to My Words
           </a>
         )}
-        {!isSingleMode && complete && (
-          <button
-            type="button"
-            onClick={next}
-            className="ml-auto inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
-          >
-            Next <ChevronRight size={16} />
-          </button>
+        {!isSingleMode && (
+          <>
+            {!isLastChar && complete && (
+              <button
+                type="button"
+                onClick={nextChar}
+                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              >
+                Next Character <ChevronRight size={16} />
+              </button>
+            )}
+            {isLastChar && complete && (
+              <button
+                type="button"
+                onClick={next}
+                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              >
+                Next Word <ChevronRight size={16} />
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -424,6 +485,9 @@ function WritingPage() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">{word.chinese}</p>
           <p className="mt-1 text-sm text-slate-600">{word.pinyin} · {word.khmer} · {word.english}</p>
+          {characters.length > 1 && (
+            <p className="mt-1 text-xs text-sky-600">Practicing: <span className="font-bold text-[#b91c1c]">{character}</span> (character {charIndex + 1} of {characters.length})</p>
+          )}
         </div>
         <span className="text-sm font-semibold text-sky-700">{complete ? 'Great work!' : 'Keep tracing'}</span>
       </div>
