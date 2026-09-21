@@ -188,11 +188,9 @@ export default function ReviewPage() {
     return (
       <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
         <Trophy className="mx-auto text-amber-500" size={42} />
-        <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW TODAY HAS BEEN COMPLETED</p>
-        <p className="mt-2 text-slate-600">You've already completed your daily review. Come back tomorrow!</p>
-        <button onClick={restart} className="mt-6 inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">
-          <RotateCcw size={17} /> Try again (for practice)
-        </button>
+        <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW TODAY COMPLETED</p>
+        <p className="mt-2 text-slate-600">You've already completed your daily review.</p>
+        <p className="mt-4 text-lg font-semibold text-[#b91c1c]">Can Review Tomorrow</p>
       </div>
     );
   }
@@ -215,11 +213,7 @@ export default function ReviewPage() {
             Your score: {score} / {quizQuestions.length}
           </h1>
           {completeError && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{completeError}</p>}
-          {completed && (
-            <p className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
-              <Check size={16} /> Daily review completed!
-            </p>
-          )}
+          <p className="mt-5 text-lg font-semibold text-[#b91c1c]">Can Review Tomorrow</p>
         </div>
 
         {/* Results breakdown - check answer word by word */}
@@ -263,10 +257,8 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex justify-center gap-3">
-          <button onClick={restart} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700">
-            <RotateCcw size={17} /> Try again
-          </button>
+        <div className="mt-6 flex justify-center">
+          <p className="text-lg font-semibold text-[#b91c1c]">Can Review Tomorrow</p>
         </div>
       </div>
     );
