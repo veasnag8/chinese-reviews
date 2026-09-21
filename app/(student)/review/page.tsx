@@ -205,7 +205,7 @@ export default function ReviewPage() {
     );
 
   // Show results after completion
-  if (showResults || (completed && !question)) {
+  if (showResults) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
@@ -284,7 +284,12 @@ export default function ReviewPage() {
   };
 
   const next = () => {
-    setQuestionIndex((current) => current + 1);
+    if (questionIndex + 1 >= quizQuestions.length) {
+      // All questions answered, show results
+      setShowResults(true);
+    } else {
+      setQuestionIndex((current) => current + 1);
+    }
     setSelectedAnswer('');
     setAnswered(false);
   };
