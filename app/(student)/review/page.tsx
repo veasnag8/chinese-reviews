@@ -39,7 +39,7 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState('');
-  const [checked, setChecked] = useState(false);
+  const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [completed, setCompleted] = useState(false);
@@ -151,7 +151,7 @@ export default function ReviewPage() {
   const restart = () => {
     setQuestionIndex(0);
     setSelectedAnswer('');
-    setChecked(false);
+    setAnswered(false);
     setScore(0);
     setAnswers([]);
     setCompleted(false);
@@ -274,12 +274,19 @@ export default function ReviewPage() {
 
   // Main review flow - question exists here
   const correct = selectedAnswer === question.correct_answer;
+  const handleAnswer = (choice: string) => {
+    if (answered) return;
+    setSelectedAnswer(choice);
+    setAnswered(true);
+    const isCorrect = choice === question.correct_answer;
+    if (isCorrect) setScore((current) => current + 1);
+    setAnswers((current) => [...current, { question_id: question.id, selected_answer: choice, is_correct: isCorrect }]);
+  };
+
   const next = () => {
-    if (correct) setScore((current) => current + 1);
-    setAnswers((current) => [...current, { question_id: question.id, selected_answer: selectedAnswer, is_correct: correct }]);
     setQuestionIndex((current) => current + 1);
     setSelectedAnswer('');
-    setChecked(false);
+    setAnswered(false);
   };
 
   return (
@@ -303,15 +310,35 @@ export default function ReviewPage() {
           {question.choices.map((choice, index) => (
             <button
               key={`${choice}-${index}`}
-              disabled={checked}
-              onClick={() => setSelectedAnswer(choice)}
-              className={`rounded-xl border p-4 text-left font-medium ${selectedAnswer === choice ? 'border-[#b91c1c] bg-red-50' : 'border-stone-200'} ${checked && choice === question.correct_answer ? 'border-emerald-500 bg-emerald-50' : ''}`}
+              disabled={answered}
+              onClick={() => handleAnswer(choice)}
+              className={`rounded-xl border p-4 text-left font-medium transition ${
+                answered
+                  ? choice === question.correct_answer
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : choice === selectedAnswer
+                    ? 'border-red-500 bg-red-50'
+                    : 'border-stone-200'
+                  : selectedAnswer === choice
+                  ? 'border-[#b91c1c] bg-red-50'
+                  : 'border-stone-200 hover:border-sky-300 hover:bg-sky-50'
+              }`}
             >
               {String.fromCharCode(65 + index)}. {choice}
+              {answered && choice === question.correct_answer && (
+                <span className="ml-2 inline-flex items-center gap-1 text-emerald-600">
+                  <Check size={16} /> Correct
+                </span>
+              )}
+              {answered && choice === selectedAnswer && choice !== question.correct_answer && (
+                <span className="ml-2 inline-flex items-center gap-1 text-red-600">
+                  <X size={16} /> Incorrect
+                </span>
+              )}
             </button>
           ))}
         </div>
-        {checked && (
+        {answered && (
           <p className={`mt-5 rounded-xl p-3 text-sm font-semibold ${correct ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
             {correct ? (
               <>
@@ -325,14 +352,12 @@ export default function ReviewPage() {
           </p>
         )}
         <div className="mt-7 flex justify-end">
-          {checked ? (
+          {answered ? (
             <button onClick={next} className="rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white">
               Next question
             </button>
           ) : (
-            <button disabled={!selectedAnswer} onClick={() => setChecked(true)} className="rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white disabled:opacity-40">
-              Check answer
-            </button>
+            <p className="text-sm text-slate-500 self-center">Select an answer to continue</p>
           )}
         </div>
       </section>
