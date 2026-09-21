@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X, Brain } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', icon: House, admin: false },
+  { href: '/learning', label: 'Learn', icon: Brain, admin: false },
   { href: '/daily', label: 'Daily', icon: CalendarDays, admin: false },
   { href: '/words', label: 'My Words', icon: BookOpen, admin: false },
   { href: '/admin/words', label: 'Words List', icon: List, admin: true },
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const mobileNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: House },
+    { href: '/learning', label: 'Learn', icon: Brain },
     { href: '/daily', label: 'Daily', icon: CalendarDays },
     { href: '/words', label: 'My Words', icon: BookOpen },
     { href: '/sentences', label: 'Sentence', icon: TextQuote },

@@ -186,11 +186,11 @@ export default function WordsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((w) => (
-            <Link
-              href={`/writing?word=${encodeURIComponent(w.id)}`}
-              key={w.id}
-              className="rounded-2xl border border-stone-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-red-200 hover:shadow-md"
-            >
+<Link
+                href={`/writing?word=${encodeURIComponent(w.id)}&single=1`}
+                key={w.id}
+                className="rounded-2xl border border-stone-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-red-200 hover:shadow-md"
+              >
               <div className="flex justify-between">
                 <div>
                   <h2 className="text-3xl font-semibold">{w.chinese}</h2>

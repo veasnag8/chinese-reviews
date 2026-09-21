@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import HanziWriter from 'hanzi-writer';
-import { Check, ChevronRight, ChevronDown, Eye, EyeOff, RotateCcw, Search, Volume2, X } from 'lucide-react';
+import { Check, ChevronRight, ChevronDown, Eye, EyeOff, RotateCcw, Search, Volume2, X, ArrowLeft } from 'lucide-react';
 import { initialWords, type StudyWord } from '@/lib/demo-data';
 import { supabase } from '@/lib/supabase';
 
@@ -19,6 +19,7 @@ const speak = (text: string) => {
 function WritingPage() {
   const searchParams = useSearchParams();
   const wordParam = searchParams.get('word');
+  const singleMode = searchParams.get('single') === '1';
   const writerElementRef = useRef<HTMLDivElement>(null);
   const writerRef = useRef<HanziWriter | null>(null);
   const [words, setWords] = useState<StudyWord[]>(initialWords);
@@ -41,6 +42,7 @@ function WritingPage() {
 
   const word = words[wordIndex] ?? words[0] ?? initialWords[0];
   const character = [...word.chinese][0];
+  const isSingleMode = singleMode && wordParam;
 
   useEffect(() => {
     const loadWords = async () => {
@@ -125,6 +127,7 @@ function WritingPage() {
   };
 
   const selectWord = (selectedWord: StudyWord) => {
+    if (isSingleMode) return;
     const index = words.findIndex((w) => w.id === selectedWord.id);
     if (index >= 0) {
       setWordIndex(index);
@@ -244,6 +247,12 @@ function WritingPage() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-sky-600">Stroke order practice</p>
           <h1 className="mt-2 text-[2.1rem] font-black tracking-[-0.04em] text-slate-900">Trace & Practice</h1>
+          {isSingleMode && (
+            <p className="mt-1 text-sm text-sky-600 flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700">Single Word Mode</span>
+              <span>Practicing only this word from My Words</span>
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -255,63 +264,65 @@ function WritingPage() {
         </button>
       </div>
 
-      {/* Search bar */}
-      <div className="mt-4 relative" ref={searchInputRef}>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              handleSearch(e.target.value);
-            }}
-            onFocus={() => setShowSearchResults(searchResults.length > 0)}
-            placeholder="Search word by Chinese, Pinyin, Khmer, or English..."
-            className="w-full rounded-xl border border-sky-200 bg-white py-3 pl-10 pr-10 outline-none focus:ring-2 focus:ring-sky-500 text-sm"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setSearchResults([]);
-                setShowSearchResults(false);
+      {/* Search bar - hidden in single mode */}
+      {!isSingleMode && (
+        <div className="mt-4 relative" ref={searchInputRef}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                handleSearch(e.target.value);
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              aria-label="Clear search"
-            >
-              <X size={17} />
-            </button>
-          )}
-        </div>
-        {showSearchResults && searchResults.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-sky-200 bg-white shadow-lg z-20 max-h-60 overflow-y-auto">
-            {searching && (
-              <div className="p-3 text-center text-sky-600">Searching...</div>
-            )}
-            {searchResults.map((result) => (
+              onFocus={() => setShowSearchResults(searchResults.length > 0)}
+              placeholder="Search word by Chinese, Pinyin, Khmer, or English..."
+              className="w-full rounded-xl border border-sky-200 bg-white py-3 pl-10 pr-10 outline-none focus:ring-2 focus:ring-sky-500 text-sm"
+            />
+            {searchQuery && (
               <button
-                key={result.id}
                 type="button"
-                onClick={() => selectWord(result)}
-                className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-sky-50 transition"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  setShowSearchResults(false);
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                aria-label="Clear search"
               >
-                <span className="text-2xl font-bold">{result.chinese}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{result.pinyin}</p>
-                  <p className="text-xs text-slate-500 truncate">{result.khmer} · {result.english}</p>
-                </div>
-                {result.hsk && <span className="text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-700">{result.hsk}</span>}
-                <ChevronRight size={16} className="text-slate-400" />
+                <X size={17} />
               </button>
-            ))}
-            {searchResults.length === 0 && !searching && (
-              <div className="p-3 text-center text-slate-500">No words found</div>
             )}
           </div>
-        )}
-      </div>
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-sky-200 bg-white shadow-lg z-20 max-h-60 overflow-y-auto">
+              {searching && (
+                <div className="p-3 text-center text-sky-600">Searching...</div>
+              )}
+              {searchResults.map((result) => (
+                <button
+                  key={result.id}
+                  type="button"
+                  onClick={() => selectWord(result)}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-sky-50 transition"
+                >
+                  <span className="text-2xl font-bold">{result.chinese}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{result.pinyin}</p>
+                    <p className="text-xs text-slate-500 truncate">{result.khmer} · {result.english}</p>
+                  </div>
+                  {result.hsk && <span className="text-xs px-2 py-0.5 rounded bg-sky-100 text-sky-700">{result.hsk}</span>}
+                  <ChevronRight size={16} className="text-slate-400" />
+                </button>
+              ))}
+              {searchResults.length === 0 && !searching && (
+                <div className="p-3 text-center text-slate-500">No words found</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 flex items-center justify-between text-sm">
         <span className="font-semibold text-slate-700">
@@ -388,7 +399,15 @@ function WritingPage() {
           {showGuide ? <EyeOff size={16} /> : <Eye size={16} />}
           {showGuide ? 'Hide guide' : 'Show guide'}
         </button>
-        {complete && (
+        {isSingleMode && (
+          <a
+            href="/words"
+            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-stone-50"
+          >
+            <ArrowLeft size={16} /> Back to My Words
+          </a>
+        )}
+        {!isSingleMode && complete && (
           <button
             type="button"
             onClick={next}
