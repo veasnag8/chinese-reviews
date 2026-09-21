@@ -178,13 +178,13 @@ function WritingPage() {
       strokeColor: '#ff9bb5',
       outlineColor: '#eaf7ff',
       highlightColor: '#ff6f91',
-      drawingColor: 'rgba(0,0,0,0)',
-      drawingWidth: 6,
-      drawingFadeDuration: 0,
-      strokeAnimationSpeed: 1,
-      delayBetweenStrokes: 220,
-      showHintAfterMisses: 2,
-      highlightOnComplete: false,
+      drawingColor: '#1a1a2e',
+      drawingWidth: 8,
+      drawingFadeDuration: 300,
+      strokeAnimationSpeed: 1.2,
+      delayBetweenStrokes: 300,
+      showHintAfterMisses: 1,
+      highlightOnComplete: true,
       onCorrectStroke: (strokeData) => {
         setStrokeCount(strokeData.strokeNum + 1);
         setTotalStrokes(strokeData.strokeNum + strokeData.strokesRemaining + 1);
@@ -352,24 +352,26 @@ function WritingPage() {
       </div>
 
       <div className="mt-6 rounded-[20px] border border-sky-200 bg-[#f5f9fc] p-3 shadow-[0_12px_32px_rgba(75,132,171,0.08)]">
-        <div className="relative mx-auto aspect-square w-full max-w-[760px] overflow-hidden rounded-[14px] border-2 border-sky-100 bg-[#61b4e7] shadow-inner">
+        <div className="relative mx-auto aspect-square w-full max-w-[760px] overflow-hidden rounded-[14px] border-2 border-sky-100 bg-[#61b4e7] shadow-inner touch-none select-none">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_49.8%,rgba(225,246,255,0.48)_50%,transparent_50.2%),linear-gradient(0deg,transparent_49.8%,rgba(225,246,255,0.48)_50%,transparent_50.2%),linear-gradient(45deg,transparent_49.8%,rgba(225,246,255,0.3)_50%,transparent_50.2%),linear-gradient(-45deg,transparent_49.8%,rgba(225,246,255,0.3)_50%,transparent_50.2%)]" />
           <div
             ref={writerElementRef}
-            className="absolute inset-0 cursor-crosshair"
+            className="absolute inset-0 cursor-crosshair touch-none select-none"
+            style={{ touchAction: 'none' }}
             aria-label={`Stroke order practice for ${character}`}
           />
           {boardSize > 0 && (
             <svg
               viewBox={`0 0 ${boardSize} ${boardSize}`}
-              className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+              className="pointer-events-none absolute inset-0 z-10 h-full w-full touch-none select-none"
+              style={{ touchAction: 'none' }}
               aria-hidden="true"
             >
               <g
                 transform={`translate(22 ${boardSize - (22 + 124 * ((boardSize - 44) / 1024))}) scale(${(boardSize - 44) / 1024} ${-((boardSize - 44) / 1024)})`}
               >
                 {strokePaths.slice(0, strokeCount).map((path, index) => (
-                  <path key={`${index}-${path}`} d={path} fill="#000000" />
+                  <path key={`${index}-${path}`} d={path} fill="#1a1a2e" stroke="#1a1a2e" strokeWidth="2" />
                 ))}
               </g>
             </svg>
