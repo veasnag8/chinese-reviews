@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Volume2, ChevronRight, Check, X, Sparkles, RotateCcw, Mic, MicOff } from 'lucide-react';
+import { Volume2, ChevronRight, Check, X, Sparkles, RotateCcw, Mic, MicOff, ArrowLeft } from 'lucide-react';
+import HanziWriter from 'hanzi-writer';
 
 type LearningWord = {
   id: string;
@@ -71,6 +72,18 @@ export default function LearningPage() {
   const [speechError, setSpeechError] = useState('');
   const speechRecognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const audioPlayedRef = useRef(false);
+
+  // Writing practice state
+  const writerElementRef = useRef<HTMLDivElement>(null);
+  const writerRef = useRef<HanziWriter | null>(null);
+  const [strokeCount, setStrokeCount] = useState(0);
+  const [totalStrokes, setTotalStrokes] = useState(0);
+  const [strokePaths, setStrokePaths] = useState<string[]>([]);
+  const [boardSize, setBoardSize] = useState(0);
+  const [showCorrectPopup, setShowCorrectPopup] = useState(false);
+  const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [writeComplete, setWriteComplete] = useState(false);
+  const [charIndex, setCharIndex] = useState(0);
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -185,12 +198,126 @@ export default function LearningPage() {
     setSpeechResult('');
     setSpeechError('');
     audioPlayedRef.current = false;
+    // Reset writing state
+    setStrokeCount(0);
+    setTotalStrokes(0);
+    setStrokePaths([]);
+    setBoardSize(0);
+    setShowCorrectPopup(false);
+    setWriteComplete(false);
+    setCharIndex(0);
   };
 
   const currentWord = words[currentWordIndex];
   const currentSentence = sentences[currentSentenceIndex];
   const isLastWord = currentWordIndex === words.length - 1;
   const isLastSentence = currentSentenceIndex === sentences.length - 1;
+
+  // Writing practice: split word into characters
+  const characters = currentWord ? [...currentWord.chinese] : [];
+  const character = characters[charIndex] || '';
+  const isLastChar = charIndex === characters.length - 1;
+
+  // HanziWriter effect for practice-writing step
+  useEffect(() => {
+    if (step !== 'practice-writing' || !character) return;
+    
+    const element = writerElementRef.current;
+    if (!element) return;
+
+    element.replaceChildren();
+    setStrokeCount(0);
+    setTotalStrokes(0);
+    setStrokePaths([]);
+    setWriteComplete(false);
+    setShowCorrectPopup(false);
+
+    let cancelled = false;
+    HanziWriter.loadCharacterData(character).then((data) => {
+      if (!cancelled && data) {
+        setStrokePaths(data.strokes);
+        setTotalStrokes(data.strokes.length);
+      }
+    });
+
+    const writer = HanziWriter.create(element, character, {
+      width: '100%' as unknown as number,
+      height: '100%' as unknown as number,
+      padding: 22,
+      showOutline: true,
+      showCharacter: true,
+      strokeColor: '#ff9bb5',
+      outlineColor: '#eaf7ff',
+      highlightColor: '#ff6f91',
+      drawingColor: '#1a1a2e',
+      drawingWidth: 8,
+      drawingFadeDuration: 300,
+      strokeAnimationSpeed: 1.2,
+      delayBetweenStrokes: 300,
+      showHintAfterMisses: 1,
+      highlightOnComplete: true,
+      onCorrectStroke: (strokeData) => {
+        setStrokeCount(strokeData.strokeNum + 1);
+        setTotalStrokes(strokeData.strokeNum + strokeData.strokesRemaining + 1);
+        setShowCorrectPopup(true);
+        if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+        popupTimerRef.current = setTimeout(() => setShowCorrectPopup(false), 1000);
+      },
+      onComplete: () => handleWriteComplete(),
+    });
+
+    writerRef.current = writer;
+    writer.animateCharacter().then(() => writer.quiz());
+
+    const resizeObserver = new ResizeObserver(() => {
+      const size = element.getBoundingClientRect();
+      setBoardSize(size.width);
+      writer.updateDimensions({ width: size.width, height: size.height });
+    });
+    const size = element.getBoundingClientRect();
+    setBoardSize(size.width);
+    resizeObserver.observe(element);
+
+    return () => {
+      cancelled = true;
+      resizeObserver.disconnect();
+      writer.cancelQuiz();
+      if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+      writerRef.current = null;
+    };
+  }, [step, character, charIndex]);
+
+  const handleWriteComplete = () => {
+    if (isLastChar) {
+      setWriteComplete(true);
+      setWritingDone(true);
+    } else {
+      setCharIndex(charIndex + 1);
+      setStrokeCount(0);
+      setTotalStrokes(0);
+      setStrokePaths([]);
+      setWriteComplete(false);
+      setShowCorrectPopup(false);
+    }
+  };
+
+  const handleReplayWrite = () => {
+    const writer = writerRef.current;
+    if (!writer) return;
+    writer.cancelQuiz();
+    writer.animateCharacter().then(() => writer.quiz());
+    setStrokeCount(0);
+    setTotalStrokes(0);
+    setStrokePaths([]);
+    setWriteComplete(false);
+    setShowCorrectPopup(false);
+    HanziWriter.loadCharacterData(character).then((data) => {
+      if (data) {
+        setStrokePaths(data.strokes);
+        setTotalStrokes(data.strokes.length);
+      }
+    });
+  };
 
   useEffect(() => {
     if (step === 'teach-words' && currentWord && !wordPlayed && !audioPlayedRef.current) {
@@ -391,6 +518,9 @@ export default function LearningPage() {
   }
 
   if (step === 'practice-writing' && currentWord) {
+    const wordChars = [...currentWord.chinese];
+    const totalChars = wordChars.length;
+
     return (
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between">
@@ -418,29 +548,112 @@ export default function LearningPage() {
           </div>
         </section>
 
+        {/* Character progress */}
+        <div className="mt-4 flex items-center justify-center gap-2">
+          {wordChars.map((c, idx) => (
+            <span
+              key={idx}
+              className={`text-3xl font-bold transition-colors ${
+                idx < charIndex ? 'text-emerald-600' : idx === charIndex ? 'text-[#b91c1c]' : 'text-stone-300'
+              }`}
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+
+        {/* Writing canvas */}
         <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <div className="aspect-square max-w-xs mx-auto rounded-xl border-2 border-stone-200 bg-stone-50 relative overflow-hidden">
-            <div className="absolute inset-0 flex items-center justify-center text-6xl font-bold text-stone-200">{currentWord.chinese}</div>
-            <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
-              <div className="text-center p-4">
-                <p className="text-sm text-slate-500">Trace the character above</p>
-                <p className="mt-1 text-xs text-slate-400">Use your finger or mouse</p>
+          <div className="aspect-square max-w-xs mx-auto rounded-xl border-2 border-sky-100 bg-sky-50 relative overflow-hidden touch-none select-none">
+            <div
+              ref={writerElementRef}
+              className="absolute inset-0 cursor-crosshair touch-none select-none"
+              style={{ touchAction: 'none' }}
+              aria-label={`Stroke order practice for ${character}`}
+            />
+            {boardSize > 0 && (
+              <svg
+                viewBox={`0 0 ${boardSize} ${boardSize}`}
+                className="pointer-events-none absolute inset-0 z-10 h-full w-full touch-none select-none"
+                style={{ touchAction: 'none' }}
+                aria-hidden="true"
+              >
+                <g
+                  transform={`translate(22 ${boardSize - (22 + 124 * ((boardSize - 44) / 1024))}) scale(${(boardSize - 44) / 1024} ${-((boardSize - 44) / 1024)})`}
+                >
+                  {strokePaths.slice(0, strokeCount).map((path, index) => (
+                    <path key={`${index}-${path}`} d={path} fill="#1a1a2e" stroke="#1a1a2e" strokeWidth="2" />
+                  ))}
+                </g>
+              </svg>
+            )}
+
+            {showCorrectPopup && (
+              <div className="pointer-events-none absolute left-1/2 top-5 z-30 -translate-x-1/2 animate-[correct-pop_1s_ease-out_forwards] rounded-full bg-white px-4 py-2 text-sm font-bold text-emerald-600 shadow-lg ring-1 ring-emerald-100">
+                <Check size={16} className="mr-1 inline" /> ត្រឹមត្រូវ!
               </div>
-            </div>
+            )}
           </div>
+
+          {/* Current character display */}
+          <div className="mt-4 text-center">
+            <p className="text-sm text-slate-500">Current character:</p>
+            <p className="mt-1 text-5xl font-bold text-[#b91c1c] tracking-wide">{character}</p>
+            <p className="text-sm text-slate-500">{currentWord.pinyin}</p>
+          </div>
+
+          {/* Stroke indicators */}
+          <div className="mt-4 flex flex-wrap gap-2 justify-center">
+            {Array.from({ length: totalStrokes || strokePaths.length || 1 }, (_, index) => index + 1).map((step) => {
+              const done = step <= strokeCount;
+              const active = step === strokeCount + 1 && !writeComplete;
+              return (
+                <span
+                  key={step}
+                  className={[
+                    'grid size-9 place-items-center rounded-full border text-xs font-bold',
+                    done ? 'border-sky-500 bg-sky-500 text-white' : '',
+                    active ? 'border-sky-500 bg-sky-50 text-sky-700 ring-4 ring-sky-100' : '',
+                    !done && !active ? 'border-sky-100 bg-slate-50 text-slate-300' : '',
+                  ].join(' ')}
+                >
+                  {done ? '✓' : step}
+                </span>
+              );
+            })}
+          </div>
+
           <div className="mt-6 flex justify-center gap-3">
             <button
-              onClick={handleReplayWord}
+              onClick={handleReplayWrite}
               className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
             >
-              <Volume2 size={16} /> Listen Again
+              <RotateCcw size={16} /> Replay
             </button>
-            <button
-              onClick={handleWritingComplete}
-              className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
-            >
-              <Check size={16} /> Done Writing
-            </button>
+            {!writeComplete && (
+              <button
+                onClick={handleReplayWord}
+                className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
+              >
+                <Volume2 size={16} /> Listen Again
+              </button>
+            )}
+            {isLastChar && writeComplete && (
+              <button
+                onClick={handleWritingComplete}
+                className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              >
+                <Check size={16} /> Continue to Speaking
+              </button>
+            )}
+            {!isLastChar && writeComplete && (
+              <button
+                onClick={() => setCharIndex(charIndex + 1)}
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+              >
+                Next Character <ChevronRight size={16} />
+              </button>
+            )}
           </div>
         </div>
       </div>
