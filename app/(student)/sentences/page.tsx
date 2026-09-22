@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Heart, Upload, AlertCircle, CheckCircle, Loader2, Volume2 } from "lucide-react";
+import { Heart, Upload, AlertCircle, CheckCircle, Loader2, Volume2, X, Edit2, Trash2 } from "lucide-react";
 import { fetchFavoriteIds, toggleFavorite } from "@/lib/favorites";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,31 @@ const sentenceSchema = z.object({
 
 type SentenceFormData = z.infer<typeof sentenceSchema>;
 
+const speakWithSynthesis = (text: string) => {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "zh-CN";
+  utterance.rate = 0.8;
+  window.speechSynthesis.speak(utterance);
+};
+
+const speak = (text: string, audioUrl?: string | null) => {
+  if (audioUrl) {
+    try {
+      const audio = new Audio(audioUrl);
+      audio.play().catch(() => {
+        speakWithSynthesis(text);
+      });
+      return;
+    } catch {
+      speakWithSynthesis(text);
+      return;
+    }
+  }
+  speakWithSynthesis(text);
+};
+
 export default function SentencesPage() {
   const router = useRouter();
 
@@ -33,13 +58,24 @@ export default function SentencesPage() {
   const [isStaff, setIsStaff] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingSentence, setEditingSentence] = useState<any | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    chineseSentence: "",
+    pinyin: "",
+    khmerTranslation: "",
+    englishTranslation: "",
+    audioUrl: "",
+    classId: "",
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
   const [favoriteSentences, setFavoriteSentences] = useState<Set<string>>(new Set());
-  const [favoriteError, setFavoriteError] = useState('');
+  const [favoriteError, setFavoriteError] = useState("");
   const [favoritesReady, setFavoritesReady] = useState(false);
   const [pendingFavorites, setPendingFavorites] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState('');
+  const [importError, setImportError] = useState("");
   const [importSuccess, setImportSuccess] = useState(0);
   const pendingFavoriteIds = useRef(new Set<string>());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -236,7 +272,51 @@ export default function SentencesPage() {
     await fetchSentences();
   };
 
+  const startEditing = (sentence: any) => {
+    setEditingSentence(sentence);
+    setEditFormData({
+      chineseSentence: sentence.chinese_sentence || "",
+      pinyin: sentence.pinyin || "",
+      khmerTranslation: sentence.khmer_translation || "",
+      englishTranslation: sentence.english_translation || "",
+      audioUrl: sentence.audio_url || "",
+      classId: sentence.class_id || "",
+    });
+    setEditError("");
+  };
+
+  const saveEditSentence = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSentence || !editFormData.chineseSentence.trim()) return;
+
+    setIsSavingEdit(true);
+    setEditError("");
+
+    const { error } = await (supabase.from("sentences") as any)
+      .update({
+        chinese_sentence: editFormData.chineseSentence.trim(),
+        pinyin: editFormData.pinyin.trim() || null,
+        khmer_translation: editFormData.khmerTranslation.trim() || null,
+        english_translation: editFormData.englishTranslation.trim() || null,
+        audio_url: editFormData.audioUrl.trim() || null,
+        class_id: editFormData.classId || null,
+      })
+      .eq("id", editingSentence.id);
+
+    setIsSavingEdit(false);
+
+    if (error) {
+      setEditError(error.message || "Failed to update sentence.");
+      return;
+    }
+
+    setEditingSentence(null);
+    await fetchSentences();
+  };
+
   const deleteSentence = async (sentenceId: string) => {
+    if (!window.confirm("Are you sure you want to delete this sentence?")) return;
+
     const { error } = await supabase
       .from("sentences")
       .delete()
@@ -244,6 +324,7 @@ export default function SentencesPage() {
 
     if (error) {
       console.error(error);
+      setFavoriteError(error.message || "Failed to delete sentence");
       return;
     }
 
@@ -338,6 +419,134 @@ export default function SentencesPage() {
           </form>
         )}
 
+        {/* Edit Sentence Modal */}
+        {editingSentence && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between border-b pb-3 mb-4">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <Edit2 size={18} className="text-[#b91c1c]" /> Edit Sentence
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingSentence(null)}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-stone-100 hover:text-slate-700"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {editError && (
+                <p className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {editError}
+                </p>
+              )}
+
+              <form onSubmit={saveEditSentence} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Class</label>
+                  <select
+                    value={editFormData.classId}
+                    onChange={(e) => setEditFormData({ ...editFormData, classId: e.target.value })}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Unassigned</option>
+                    {classes.map((cls: any) => (
+                      <option key={cls.id} value={cls.id}>
+                        {cls.date ? `${cls.date} — ${cls.name}` : cls.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium">Chinese Sentence *</label>
+                    <button
+                      type="button"
+                      onClick={() => speak(editFormData.chineseSentence, editFormData.audioUrl)}
+                      className="inline-flex items-center gap-1 text-xs text-[#b91c1c] font-semibold hover:underline"
+                    >
+                      <Volume2 size={14} /> Test voice
+                    </button>
+                  </div>
+                  <textarea
+                    required
+                    value={editFormData.chineseSentence}
+                    onChange={(e) => setEditFormData({ ...editFormData, chineseSentence: e.target.value })}
+                    className="w-full min-h-20 rounded-xl border border-stone-200 p-3 text-base"
+                    placeholder="Enter Chinese sentence..."
+                  />
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Pinyin</label>
+                    <input
+                      type="text"
+                      value={editFormData.pinyin}
+                      onChange={(e) => setEditFormData({ ...editFormData, pinyin: e.target.value })}
+                      className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                      placeholder="Pinyin"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Khmer Translation</label>
+                    <input
+                      type="text"
+                      value={editFormData.khmerTranslation}
+                      onChange={(e) => setEditFormData({ ...editFormData, khmerTranslation: e.target.value })}
+                      className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                      placeholder="Khmer translation"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">English Translation</label>
+                    <input
+                      type="text"
+                      value={editFormData.englishTranslation}
+                      onChange={(e) => setEditFormData({ ...editFormData, englishTranslation: e.target.value })}
+                      className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                      placeholder="English translation"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Audio URL (optional)</label>
+                    <input
+                      type="text"
+                      value={editFormData.audioUrl}
+                      onChange={(e) => setEditFormData({ ...editFormData, audioUrl: e.target.value })}
+                      className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingSentence(null)}
+                    disabled={isSavingEdit}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={isSavingEdit || !editFormData.chineseSentence.trim()}
+                  >
+                    {isSavingEdit ? "Saving Changes..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {sentences.length === 0 ? (
           <EmptyState>
             <p>No sentences yet</p>
@@ -347,10 +556,10 @@ export default function SentencesPage() {
           </EmptyState>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border bg-card">
+                  <tr className="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                     <th className="p-3 text-left">Sentence</th>
                     <th className="p-3 text-left">Pinyin</th>
                     <th className="p-3 text-left">Khmer</th>
@@ -360,74 +569,88 @@ export default function SentencesPage() {
                   </tr>
                 </thead>
 
-                <tbody>
+                <tbody className="divide-y divide-stone-100">
                   {sentences
                     .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
                     .map((sentence: any) => (
                       <tr
                         key={sentence.id}
-                        className="hover:bg-muted/50"
+                        className="hover:bg-stone-50/70 transition"
                       >
-                        <td className="p-3 truncate">
-                          {sentence.chinese_sentence}
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => speak(sentence.chinese_sentence, sentence.audio_url)}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-red-50 hover:text-[#b91c1c] transition shrink-0"
+                              title="Listen to sentence"
+                              aria-label="Listen"
+                            >
+                              <Volume2 size={18} />
+                            </button>
+                            <span className="font-semibold text-base text-slate-900">
+                              {sentence.chinese_sentence}
+                            </span>
+                          </div>
                         </td>
 
-                        <td className="p-3">
+                        <td className="p-3 text-sm text-[#b91c1c] font-medium">
                           {sentence.pinyin || "—"}
                         </td>
 
-                        <td className="p-3">
+                        <td className="p-3 text-sm text-slate-700">
                           {sentence.khmer_translation || "—"}
                         </td>
 
-                        <td className="p-3">
+                        <td className="p-3 text-sm text-slate-600">
                           {sentence.english_translation || "—"}
                         </td>
 
-                        <td className="p-3">
+                        <td className="p-3 text-sm text-slate-500">
                           {sentence.classes?.name ||
                             sentence.classes?.date ||
                             sentence.class_name ||
                             "—"}
                         </td>
 
-                        <td className="p-3 flex gap-2">
-                          <button
-                            type="button"
-                            disabled={!favoritesReady || pendingFavorites.has(sentence.id)}
-                            onClick={() => void toggleSentenceFavorite(sentence.id)}
-                            aria-pressed={favoriteSentences.has(sentence.id)}
-                            aria-label={`${favoriteSentences.has(sentence.id) ? 'Remove' : 'Save'} sentence ${favoriteSentences.has(sentence.id) ? 'from' : 'to'} favorites`}
-                            className={`rounded-lg p-2 disabled:opacity-50 ${favoriteSentences.has(sentence.id) ? 'text-red-500' : 'text-slate-400'}`}
-                          >
-                            <Heart size={20} fill={favoriteSentences.has(sentence.id) ? 'currentColor' : 'none'} />
-                          </button>
-                          {isAdmin ? (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                type="button"
-                              >
-                                Edit
-                              </Button>
+                        <td className="p-3">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={!favoritesReady || pendingFavorites.has(sentence.id)}
+                              onClick={() => void toggleSentenceFavorite(sentence.id)}
+                              aria-pressed={favoriteSentences.has(sentence.id)}
+                              aria-label={`${favoriteSentences.has(sentence.id) ? 'Remove' : 'Save'} sentence ${favoriteSentences.has(sentence.id) ? 'from' : 'to'} favorites`}
+                              className={`rounded-lg p-1.5 transition disabled:opacity-50 ${favoriteSentences.has(sentence.id) ? 'text-red-500 hover:bg-red-50' : 'text-slate-400 hover:bg-stone-100 hover:text-slate-600'}`}
+                              title={favoriteSentences.has(sentence.id) ? "Remove favorite" : "Add to favorites"}
+                            >
+                              <Heart size={18} fill={favoriteSentences.has(sentence.id) ? 'currentColor' : 'none'} />
+                            </button>
 
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                type="button"
-                                onClick={() =>
-                                  deleteSentence(sentence.id)
-                                }
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Admin only
-                            </span>
-                          )}
+                            {(isStaff || isAdmin || sentence.user_id === user) ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  type="button"
+                                  onClick={() => startEditing(sentence)}
+                                  className="h-8 px-2.5 text-xs"
+                                >
+                                  <Edit2 size={13} className="mr-1" /> Edit
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  type="button"
+                                  onClick={() => deleteSentence(sentence.id)}
+                                  className="h-8 px-2.5 text-xs"
+                                >
+                                  <Trash2 size={13} className="mr-1" /> Delete
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}
