@@ -71,6 +71,7 @@ export default function LearningPage() {
   const [speechResult, setSpeechResult] = useState('');
   const [speechError, setSpeechError] = useState('');
   const speechRecognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const isHoldingRef = useRef(false);
   const audioPlayedRef = useRef(false);
 
   // Writing practice state
@@ -328,50 +329,107 @@ export default function LearningPage() {
   }, [step, currentWord, wordPlayed]);
 
   useEffect(() => {
-    if (step === 'speak-word' && currentWord && !speechRecognizing) {
-      startSpeechRecognition();
-    }
     return () => {
       if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.stop();
+        try {
+          speechRecognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
       }
+      isHoldingRef.current = false;
     };
-  }, [step, currentWord]);
+  }, [step, currentWordIndex]);
 
-  const startSpeechRecognition = () => {
+  const startHoldSpeaking = (e?: React.SyntheticEvent) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (typeof window === 'undefined') return;
-    
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setSpeechError('Speech recognition not supported in this browser');
+      setSpeechError('Speech recognition is not supported in this browser. You can click skip or continue.');
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'zh-CN';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    isHoldingRef.current = true;
+    setSpeechError('');
 
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript.trim();
-      setSpeechResult(transcript);
-      if (transcript === currentWord?.chinese) {
-        setSpeechDone(true);
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'zh-CN';
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 3;
+      recognition.continuous = true;
+
+      recognition.onresult = (event: any) => {
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        const transcript = fullTranscript.trim();
+        setSpeechResult(transcript);
+
+        const normalize = (s: string) => s.replace(/[\s\p{P}\p{S}]/gu, '').toLowerCase();
+        const target = normalize(currentWord?.chinese || '');
+        const spoken = normalize(transcript);
+
+        if (spoken && (spoken.includes(target) || target.includes(spoken))) {
+          setSpeechDone(true);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+          setSpeechError(`Recognition error: ${event.error}`);
+        }
+        setSpeechRecognizing(false);
+      };
+
+      recognition.onend = () => {
+        setSpeechRecognizing(false);
+      };
+
+      speechRecognitionRef.current = recognition;
+      setSpeechRecognizing(true);
+      recognition.start();
+    } catch (err: any) {
+      console.error('Speech recognition start error:', err);
+      setSpeechError('Could not start microphone. Please check browser permissions.');
+      setSpeechRecognizing(false);
+    }
+  };
+
+  const stopHoldSpeaking = (e?: React.SyntheticEvent) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    if (!isHoldingRef.current && !speechRecognizing) return;
+    isHoldingRef.current = false;
+
+    setTimeout(() => {
+      if (speechRecognitionRef.current) {
+        try {
+          speechRecognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
       }
-    };
-
-    recognition.onerror = (event: any) => {
-      setSpeechError(`Recognition error: ${event.error}`);
       setSpeechRecognizing(false);
-    };
-
-    recognition.onend = () => {
-      setSpeechRecognizing(false);
-    };
-
-    speechRecognitionRef.current = recognition;
-    setSpeechRecognizing(true);
-    recognition.start();
+    }, 250);
   };
 
   const handleWritingComplete = () => {
@@ -675,64 +733,119 @@ export default function LearningPage() {
 
         <section className="rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
           <p className="text-sm text-slate-500">Say the word aloud</p>
-          <p className="mt-5 text-6xl font-semibold">{currentWord.chinese}</p>
+          <p className="mt-5 text-6xl font-semibold tracking-wide">{currentWord.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <span className="text-xl text-slate-500">{currentWord.pinyin}</span>
+            <span className="text-xl font-medium text-slate-600">{currentWord.pinyin}</span>
             <button
               onClick={handleReplayWord}
-              className="grid size-10 place-items-center rounded-full border border-stone-200 bg-white text-slate-600 hover:bg-red-50 hover:text-[#b91c1c] hover:border-red-200"
+              className="grid size-10 place-items-center rounded-full border border-stone-200 bg-white text-slate-600 hover:bg-red-50 hover:text-[#b91c1c] hover:border-red-200 transition-colors"
+              title="Listen to native pronunciation"
               aria-label="Replay pronunciation"
             >
               <Volume2 size={20} />
             </button>
           </div>
+          {currentWord.khmer && (
+            <p className="mt-2 text-sm text-slate-500">{currentWord.khmer}</p>
+          )}
         </section>
 
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-          <div className="text-center">
-            {speechRecognizing ? (
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full bg-red-100 px-4 py-2 text-red-700 font-medium">
-                  <Mic className="animate-pulse" size={18} fill="currentColor" /> Listening...
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-sm">
+          <div className="flex flex-col items-center text-center">
+            {speechDone ? (
+              <div className="w-full max-w-md space-y-4">
+                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2.5 text-emerald-800 font-semibold shadow-sm">
+                  <Check size={20} className="stroke-[3]" /> Correct! Well done.
                 </div>
-                <p className="text-sm text-slate-500">Say: <span className="font-semibold text-[#b91c1c]">{currentWord.chinese}</span></p>
-              </div>
-            ) : speechDone ? (
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-emerald-700 font-medium">
-                  <Check size={18} /> Correct! Well done.
+                <p className="text-sm text-slate-600">
+                  You said: <span className="font-semibold text-emerald-700">{speechResult || currentWord.chinese}</span>
+                </p>
+
+                <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button
+                    onMouseDown={startHoldSpeaking}
+                    onMouseUp={stopHoldSpeaking}
+                    onMouseLeave={stopHoldSpeaking}
+                    onTouchStart={startHoldSpeaking}
+                    onTouchEnd={stopHoldSpeaking}
+                    onTouchCancel={stopHoldSpeaking}
+                    className="select-none touch-none inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-stone-50 px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
+                  >
+                    <Mic size={15} /> Hold to Practice Again
+                  </button>
+                  <button
+                    onClick={handleNextWord}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-6 py-3 text-sm font-semibold text-white hover:bg-[#991b1b] shadow-md shadow-red-200 active:scale-95 transition-all w-full sm:w-auto"
+                  >
+                    {isLastWord && sentences.length > 0 ? 'Go to Sentences' : isLastWord ? 'Complete' : 'Next Word'} <ChevronRight size={18} />
+                  </button>
                 </div>
-                <p className="text-sm text-slate-500">You said: <span className="font-semibold">{speechResult || currentWord.chinese}</span></p>
               </div>
             ) : (
-              <div className="space-y-4">
-                <button
-                  onClick={startSpeechRecognition}
-                  disabled={speechRecognizing}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-6 py-3 text-sm font-semibold text-white"
-                >
-                  <Mic size={18} /> Start Speaking
-                </button>
-                <p className="text-sm text-slate-500">Click the button and say: <span className="font-semibold text-[#b91c1c]">{currentWord.chinese}</span></p>
-                {speechError && <p className="text-sm text-red-600">{speechError}</p>}
-              </div>
-            )}
-            {speechResult && !speechDone && !speechRecognizing && (
-              <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
-                Heard: <span className="font-semibold">{speechResult}</span> - Try again!
+              <div className="w-full max-w-md space-y-5">
+                {/* Hold to speak circular button */}
+                <div className="relative mx-auto flex flex-col items-center">
+                  {speechRecognizing && (
+                    <span className="absolute -inset-3 rounded-full bg-red-400/30 animate-ping pointer-events-none" />
+                  )}
+                  <button
+                    onMouseDown={startHoldSpeaking}
+                    onMouseUp={stopHoldSpeaking}
+                    onMouseLeave={stopHoldSpeaking}
+                    onTouchStart={startHoldSpeaking}
+                    onTouchEnd={stopHoldSpeaking}
+                    onTouchCancel={stopHoldSpeaking}
+                    className={`select-none touch-none relative z-10 grid size-24 place-items-center rounded-full shadow-lg transition-all active:scale-90 cursor-pointer ${
+                      speechRecognizing
+                        ? 'bg-red-600 text-white shadow-red-300 scale-105 ring-4 ring-red-300'
+                        : 'bg-[#b91c1c] text-white hover:bg-[#991b1b] shadow-stone-300 hover:scale-105'
+                    }`}
+                    aria-label="Hold to speak"
+                  >
+                    <Mic size={40} className={speechRecognizing ? 'animate-pulse' : ''} />
+                  </button>
+                </div>
+
+                {/* Instructions */}
+                <div>
+                  <p className="text-base font-bold text-slate-800">
+                    {speechRecognizing ? '🔴 Recording... Keep holding & speak!' : 'ចុចសង្កត់ដើម្បីនិយាយ / Hold to Speak'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {speechRecognizing
+                      ? `Say: "${currentWord.chinese}" clearly`
+                      : 'Hold button with mouse or finger, speak the word, then release'}
+                  </p>
+                </div>
+
+                {/* Spoken result / feedback */}
+                {speechResult && !speechDone && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    Heard: <span className="font-semibold">{speechResult}</span> — Try holding and speaking again!
+                  </div>
+                )}
+
+                {speechError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                    {speechError}
+                  </div>
+                )}
+
+                {/* Skip option */}
+                <div className="pt-2 border-t border-stone-100">
+                  <button
+                    onClick={() => {
+                      setSpeechDone(true);
+                      handleNextWord();
+                    }}
+                    className="text-xs font-semibold text-slate-400 hover:text-slate-600 hover:underline"
+                  >
+                    Skip pronunciation practice →
+                  </button>
+                </div>
               </div>
             )}
           </div>
-          {speechDone && (
-            <div className="mt-6 flex justify-center">
-              <button
-                onClick={handleNextWord}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-6 py-3 text-sm font-semibold text-white"
-              >
-                {isLastWord && sentences.length > 0 ? 'Go to Sentences' : isLastWord ? 'Complete' : 'Next Word'} <ChevronRight size={17} />
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
