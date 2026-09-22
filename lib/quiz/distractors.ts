@@ -68,3 +68,11 @@ export function meaningFromWord(word: {
 }) {
   return (word.khmer || word.english || word.pinyin || '').trim();
 }
+
+export function meaningFromSentence(sentence: {
+  khmer_translation?: string | null;
+  english_translation?: string | null;
+  pinyin?: string | null;
+}) {
+  return (sentence.khmer_translation || sentence.english_translation || sentence.pinyin || '').trim();
+}

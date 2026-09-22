@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { meaningFromWord, shuffleChoices } from '@/lib/quiz/distractors';
+import { meaningFromSentence, meaningFromWord, shuffleChoices } from '@/lib/quiz/distractors';
 
 /**
  * The hand-written Database type does not fully satisfy Supabase's
@@ -70,6 +70,16 @@ export type WordPoolItem = {
   khmer: string | null;
   english: string | null;
   category: string | null;
+  class_id: string | null;
+  class_name: string | null;
+};
+
+export type SentencePoolItem = {
+  id: string;
+  chinese_sentence: string;
+  pinyin: string | null;
+  khmer_translation: string | null;
+  english_translation: string | null;
   class_id: string | null;
   class_name: string | null;
 };
@@ -322,6 +332,66 @@ export function buildQuestionsFromWords(
   return questions;
 }
 
+export function buildQuestionsFromSentences(
+  selected: SentencePoolItem[],
+  pool: SentencePoolItem[],
+  wordPool?: WordPoolItem[]
+): QuizQuestion[] {
+  const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+  const questions: QuizQuestion[] = [];
+
+  selected.forEach((sentence) => {
+    const answer = meaningFromSentence(sentence);
+    if (!answer) throw new Error(`Add a translation for “${sentence.chinese_sentence}” before saving.`);
+
+    const candidates = new Map<string, string>();
+    pool.forEach((candidate) => {
+      const meaning = meaningFromSentence(candidate);
+      const key = normalize(meaning);
+      if (
+        candidate.id !== sentence.id &&
+        candidate.chinese_sentence.trim() !== sentence.chinese_sentence.trim() &&
+        key &&
+        key !== normalize(answer)
+      ) {
+        candidates.set(key, meaning);
+      }
+    });
+
+    if (candidates.size < 3 && wordPool) {
+      wordPool.forEach((word) => {
+        const meaning = meaningFromWord(word);
+        const key = normalize(meaning);
+        if (key && key !== normalize(answer) && !candidates.has(key)) {
+          candidates.set(key, meaning);
+        }
+      });
+    }
+
+    const distractors = shuffleChoices(Array.from(candidates.values())).slice(0, 3);
+    if (distractors.length < 1) {
+      throw new Error(`“${sentence.chinese_sentence}” needs at least one wrong answer. Add more sentences or words.`);
+    }
+
+    const options = shuffleChoices([
+      { option_text: answer, is_correct: true },
+      ...distractors.map((text) => ({ option_text: text, is_correct: false })),
+    ]);
+
+    questions.push({
+      clientId: newClientId(),
+      question: `What is the meaning of “${sentence.chinese_sentence}”?`,
+      question_type: 'single',
+      explanation: sentence.pinyin ? `Pinyin: ${sentence.pinyin}` : '',
+      hint: '',
+      word_id: null,
+      options,
+    });
+  });
+
+  return questions;
+}
+
 export async function fetchWordPool(): Promise<{ data: WordPoolItem[]; error?: string }> {
   if (!supabase) return { data: [], error: 'Supabase is not configured.' };
 
@@ -351,6 +421,68 @@ export async function fetchWordPool(): Promise<{ data: WordPoolItem[]; error?: s
       khmer: row.khmer,
       english: row.english,
       category: row.category,
+      class_id: row.class_id,
+      class_name: row.classes?.name ?? null,
+    })),
+  };
+}
+
+export async function fetchSentencePool(): Promise<{ data: SentencePoolItem[]; error?: string }> {
+  if (!supabase) return { data: [], error: 'Supabase is not configured.' };
+
+  const { data, error } = await supabase
+    .from('sentences')
+    .select('id, chinese_sentence, pinyin, khmer_translation, english_translation, class_id, classes!sentences_class_id_fkey(name)')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    const fallback = await supabase
+      .from('sentences')
+      .select('id, chinese_sentence, pinyin, khmer_translation, english_translation, class_id, classes(name)')
+      .order('created_at', { ascending: false });
+
+    if (fallback.error) return { data: [], error: fallback.error.message };
+
+    const fallbackRows = (fallback.data || []) as unknown as {
+      id: string;
+      chinese_sentence: string;
+      pinyin: string | null;
+      khmer_translation: string | null;
+      english_translation: string | null;
+      class_id: string | null;
+      classes: { name: string } | null;
+    }[];
+
+    return {
+      data: fallbackRows.map((row) => ({
+        id: row.id,
+        chinese_sentence: row.chinese_sentence,
+        pinyin: row.pinyin,
+        khmer_translation: row.khmer_translation,
+        english_translation: row.english_translation,
+        class_id: row.class_id,
+        class_name: row.classes?.name ?? null,
+      })),
+    };
+  }
+
+  const rows = (data || []) as unknown as {
+    id: string;
+    chinese_sentence: string;
+    pinyin: string | null;
+    khmer_translation: string | null;
+    english_translation: string | null;
+    class_id: string | null;
+    classes: { name: string } | null;
+  }[];
+
+  return {
+    data: rows.map((row) => ({
+      id: row.id,
+      chinese_sentence: row.chinese_sentence,
+      pinyin: row.pinyin,
+      khmer_translation: row.khmer_translation,
+      english_translation: row.english_translation,
       class_id: row.class_id,
       class_name: row.classes?.name ?? null,
     })),

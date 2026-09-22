@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowDown, ArrowUp, ChevronLeft, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, Loader2, Plus, Trash2, BookOpen, TextQuote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { sendQuizNotification } from '@/lib/notify';
 import {
+  buildQuestionsFromSentences,
   buildQuestionsFromWords,
   emptyQuestion,
+  fetchSentencePool,
   fetchWordPool,
   fromDateTimeLocal,
   HSK_OPTIONS,
@@ -24,6 +26,7 @@ import {
   type QuizQuestion,
   type QuizQuestionType,
   type QuizStatus,
+  type SentencePoolItem,
   type WordPoolItem,
 } from '@/lib/quizzes';
 
@@ -54,15 +57,29 @@ export function QuizForm({ initial }: QuizFormProps) {
   const [errorMessage, setErrorMessage] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Pool selection tab: words or sentences
+  const [poolTab, setPoolTab] = useState<'words' | 'sentences'>('words');
+
+  // Words pool state
   const [wordPool, setWordPool] = useState<WordPoolItem[]>([]);
   const [wordLoading, setWordLoading] = useState(false);
   const [wordError, setWordError] = useState('');
   const [wordSearch, setWordSearch] = useState('');
   const [selectedWordIds, setSelectedWordIds] = useState<string[]>([]);
+
+  // Sentences pool state
+  const [sentencePool, setSentencePool] = useState<SentencePoolItem[]>([]);
+  const [sentenceLoading, setSentenceLoading] = useState(false);
+  const [sentenceError, setSentenceError] = useState('');
+  const [sentenceSearch, setSentenceSearch] = useState('');
+  const [selectedSentenceIds, setSelectedSentenceIds] = useState<string[]>([]);
+
   useEffect(() => {
     let active = true;
     setWordLoading(true);
+    setSentenceLoading(true);
     setWordError('');
+    setSentenceError('');
 
     fetchWordPool().then((result) => {
       if (!active) return;
@@ -72,6 +89,16 @@ export function QuizForm({ initial }: QuizFormProps) {
       if (active) setWordError('Unable to load words. Please reload and try again.');
     }).finally(() => {
       if (active) setWordLoading(false);
+    });
+
+    fetchSentencePool().then((result) => {
+      if (!active) return;
+      if (result.error) setSentenceError(result.error);
+      setSentencePool(result.data);
+    }).catch(() => {
+      if (active) setSentenceError('Unable to load sentences. Please reload and try again.');
+    }).finally(() => {
+      if (active) setSentenceLoading(false);
     });
 
     return () => {
@@ -91,10 +118,53 @@ export function QuizForm({ initial }: QuizFormProps) {
     );
   }, [wordPool, wordSearch]);
 
+  const filteredSentences = useMemo(() => {
+    const query = sentenceSearch.trim().toLowerCase();
+    if (!query) return sentencePool;
+    return sentencePool.filter((sentence) =>
+      [
+        sentence.chinese_sentence,
+        sentence.pinyin,
+        sentence.khmer_translation,
+        sentence.english_translation,
+        sentence.class_name,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [sentencePool, sentenceSearch]);
+
   const toggleWord = (id: string) =>
     setSelectedWordIds((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
     );
+
+  const toggleSentence = (id: string) =>
+    setSelectedSentenceIds((current) =>
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
+    );
+
+  const selectAllFilteredWords = () => {
+    const ids = filteredWords.map((w) => w.id);
+    setSelectedWordIds((current) => Array.from(new Set([...current, ...ids])));
+  };
+
+  const deselectAllFilteredWords = () => {
+    const idsSet = new Set(filteredWords.map((w) => w.id));
+    setSelectedWordIds((current) => current.filter((id) => !idsSet.has(id)));
+  };
+
+  const selectAllFilteredSentences = () => {
+    const ids = filteredSentences.map((s) => s.id);
+    setSelectedSentenceIds((current) => Array.from(new Set([...current, ...ids])));
+  };
+
+  const deselectAllFilteredSentences = () => {
+    const idsSet = new Set(filteredSentences.map((s) => s.id));
+    setSelectedSentenceIds((current) => current.filter((id) => !idsSet.has(id)));
+  };
 
   const updateQuestion = (index: number, patch: Partial<QuizQuestion>) => {
     setQuestions((current) =>
@@ -217,17 +287,27 @@ export function QuizForm({ initial }: QuizFormProps) {
 
     if (saving) return;
 
-    let generated: QuizQuestion[];
+    let generatedWords: QuizQuestion[] = [];
+    let generatedSentences: QuizQuestion[] = [];
     try {
-      generated = buildQuestionsFromWords(
-        wordPool.filter((word) => selectedWordIds.includes(word.id)),
-        wordPool
-      );
+      if (selectedWordIds.length > 0) {
+        generatedWords = buildQuestionsFromWords(
+          wordPool.filter((word) => selectedWordIds.includes(word.id)),
+          wordPool
+        );
+      }
+      if (selectedSentenceIds.length > 0) {
+        generatedSentences = buildQuestionsFromSentences(
+          sentencePool.filter((sentence) => selectedSentenceIds.includes(sentence.id)),
+          sentencePool,
+          wordPool
+        );
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create questions.');
       return;
     }
-    const savedQuestions = [...questions, ...generated];
+    const savedQuestions = [...questions, ...generatedWords, ...generatedSentences];
     const validationError = validate(savedQuestions);
     if (validationError) {
       setErrorMessage(validationError);
@@ -299,7 +379,7 @@ export function QuizForm({ initial }: QuizFormProps) {
           </button>
           <h1 className="mt-2 text-3xl font-bold">{isEditing ? 'Edit Quiz' : 'Add Quiz'}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Choose words and save. Each selected word becomes a question with three randomized wrong answers.
+            Choose words and/or sentences to generate questions, or create custom questions manually.
           </p>
         </div>
       </div>
@@ -399,66 +479,220 @@ export function QuizForm({ initial }: QuizFormProps) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-stone-200 bg-white p-5">
+      <section className="rounded-2xl border border-stone-200 bg-white p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold">Select words</h2>
+            <h2 className="font-bold">Select Words &amp; Sentences</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Select words from the Words List. Saving adds one correct answer and three unique random wrong answers for each word.
+              Select words or sentences to automatically generate 4-choice quiz questions when saving.
             </p>
           </div>
         </div>
 
-          <div className="mt-4 space-y-3">
-            <input
-              value={wordSearch}
-              onChange={(event) => setWordSearch(event.target.value)}
-              placeholder="Search words by Chinese, pinyin, meaning or class"
-              className="w-full rounded-lg border border-stone-200 px-3 py-2.5 text-sm"
-            />
+        {/* Tab switcher */}
+        <div className="flex border-b border-stone-200">
+          <button
+            type="button"
+            onClick={() => setPoolTab('words')}
+            className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+              poolTab === 'words'
+                ? 'border-[#b91c1c] text-[#b91c1c]'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <BookOpen size={16} /> Words
+            <span
+              className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                selectedWordIds.length > 0
+                  ? 'bg-red-100 text-[#b91c1c]'
+                  : 'bg-stone-100 text-slate-600'
+              }`}
+            >
+              {selectedWordIds.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPoolTab('sentences')}
+            className={`inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+              poolTab === 'sentences'
+                ? 'border-[#b91c1c] text-[#b91c1c]'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <TextQuote size={16} /> Sentences
+            <span
+              className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                selectedSentenceIds.length > 0
+                  ? 'bg-red-100 text-[#b91c1c]'
+                  : 'bg-stone-100 text-slate-600'
+              }`}
+            >
+              {selectedSentenceIds.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Words Tab Content */}
+        {poolTab === 'words' && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={wordSearch}
+                onChange={(event) => setWordSearch(event.target.value)}
+                placeholder="Search words by Chinese, pinyin, meaning or class..."
+                className="flex-1 min-w-[200px] rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              />
+              {filteredWords.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllFilteredWords}
+                    className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-stone-100"
+                  >
+                    Select All ({filteredWords.length})
+                  </button>
+                  {selectedWordIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={deselectAllFilteredWords}
+                      className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-stone-100"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             {wordLoading ? (
-              <p className="flex items-center gap-2 text-sm text-slate-500">
+              <p className="flex items-center gap-2 text-sm text-slate-500 py-4">
                 <Loader2 className="animate-spin" size={15} /> Loading words...
               </p>
             ) : wordError ? (
               <p className="text-sm text-red-600">{wordError}</p>
             ) : filteredWords.length === 0 ? (
               <p className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-sm text-slate-500">
-                No words available. Add words first from the Words List.
+                No words match your search.
               </p>
             ) : (
-              <>
-                <div className="max-h-72 space-y-1.5 overflow-y-auto rounded-xl border border-stone-200 p-3">
-                  {filteredWords.map((word) => (
-                    <label
-                      key={word.id}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedWordIds.includes(word.id)}
-                        onChange={() => toggleWord(word.id)}
-                        className="size-4"
-                      />
-                      <span className="font-semibold text-slate-900">{word.chinese}</span>
-                      <span className="text-slate-500">{word.pinyin || ''}</span>
-                      <span className="truncate text-slate-500">
-                        {(word.khmer || word.english || '').trim()}
+              <div className="max-h-72 space-y-1.5 overflow-y-auto rounded-xl border border-stone-200 p-3">
+                {filteredWords.map((word) => (
+                  <label
+                    key={word.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedWordIds.includes(word.id)}
+                      onChange={() => toggleWord(word.id)}
+                      className="size-4 rounded border-stone-300 text-[#b91c1c] focus:ring-[#b91c1c]"
+                    />
+                    <span className="font-semibold text-slate-900">{word.chinese}</span>
+                    {word.pinyin && <span className="text-slate-500">{word.pinyin}</span>}
+                    <span className="truncate text-slate-600">
+                      {(word.khmer || word.english || '').trim()}
+                    </span>
+                    {word.class_name && (
+                      <span className="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-slate-500">
+                        {word.class_name}
                       </span>
-                      {word.class_name && (
-                        <span className="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-slate-500">
-                          {word.class_name}
-                        </span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-
-                <p className="text-sm text-slate-500">{selectedWordIds.length} selected — questions are created when you save.</p>
-              </>
+                    )}
+                  </label>
+                ))}
+              </div>
             )}
           </div>
+        )}
+
+        {/* Sentences Tab Content */}
+        {poolTab === 'sentences' && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={sentenceSearch}
+                onChange={(event) => setSentenceSearch(event.target.value)}
+                placeholder="Search sentences by Chinese, pinyin, translation or class..."
+                className="flex-1 min-w-[200px] rounded-lg border border-stone-200 px-3 py-2 text-sm"
+              />
+              {filteredSentences.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllFilteredSentences}
+                    className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-stone-100"
+                  >
+                    Select All ({filteredSentences.length})
+                  </button>
+                  {selectedSentenceIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={deselectAllFilteredSentences}
+                      className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-stone-100"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {sentenceLoading ? (
+              <p className="flex items-center gap-2 text-sm text-slate-500 py-4">
+                <Loader2 className="animate-spin" size={15} /> Loading sentences...
+              </p>
+            ) : sentenceError ? (
+              <p className="text-sm text-red-600">{sentenceError}</p>
+            ) : filteredSentences.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-stone-300 p-6 text-center text-sm text-slate-500">
+                No sentences available or matching your search.
+              </p>
+            ) : (
+              <div className="max-h-72 space-y-1.5 overflow-y-auto rounded-xl border border-stone-200 p-3">
+                {filteredSentences.map((sentence) => (
+                  <label
+                    key={sentence.id}
+                    className="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 text-sm hover:bg-stone-50 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSentenceIds.includes(sentence.id)}
+                      onChange={() => toggleSentence(sentence.id)}
+                      className="mt-0.5 size-4 rounded border-stone-300 text-[#b91c1c] focus:ring-[#b91c1c]"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span className="font-semibold text-slate-900">{sentence.chinese_sentence}</span>
+                        {sentence.pinyin && (
+                          <span className="text-xs text-slate-500">({sentence.pinyin})</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 truncate mt-0.5">
+                        {(sentence.khmer_translation || sentence.english_translation || '').trim()}
+                      </p>
+                    </div>
+                    {sentence.class_name && (
+                      <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-slate-500">
+                        {sentence.class_name}
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Selected Summary */}
+        {(selectedWordIds.length > 0 || selectedSentenceIds.length > 0) && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Selected to generate on save: <strong>{selectedWordIds.length} word(s)</strong> and{' '}
+              <strong>{selectedSentenceIds.length} sentence(s)</strong> (
+              {selectedWordIds.length + selectedSentenceIds.length} total questions).
+            </span>
+          </div>
+        )}
       </section>
 
       <section className="space-y-4">
