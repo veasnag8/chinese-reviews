@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, CheckCircle2, Flame, GraduationCap, Repeat2, Trophy } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, Flame, Gamepad2, GraduationCap, Repeat2, Trophy } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const stat = (label: string, value: string, icon: React.ReactNode, tone: string) => (
@@ -279,6 +279,33 @@ export default function DashboardPage() {
         {stat('Mastered', String(stats.masteredCount), <Trophy size={18} />, 'bg-amber-50 text-amber-600')}
         {stat('Accuracy', `${stats.accuracy}%`, <CheckCircle2 size={18} />, 'bg-emerald-50 text-emerald-600')}
       </section>
+
+      {/* Sentence Scramble Game Banner */}
+      <section className="rounded-3xl border border-stone-200 bg-gradient-to-r from-stone-900 via-stone-800 to-red-950 p-6 sm:p-7 text-white shadow-sm flex flex-col sm:flex-row items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="grid size-14 place-items-center rounded-2xl bg-white/10 text-amber-400 shrink-0">
+            <Gamepad2 size={30} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold">Sentence Scramble Game</h2>
+              <span className="rounded-full bg-red-500/30 text-red-300 border border-red-400/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                Grammar Practice
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-stone-300 max-w-md">
+              Master Chinese word order (S-T-P-V-O) and grammar through interactive drag-and-drop sentence building.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/scramble"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-xs font-bold text-stone-950 hover:bg-stone-100 shadow-md transition-all active:scale-95 shrink-0 w-full sm:w-auto"
+        >
+          Play Game <ArrowRight size={15} />
+        </Link>
+      </section>
+
       <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <div className="mb-4 flex items-center justify-between">

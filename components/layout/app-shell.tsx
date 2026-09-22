@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X, Brain } from 'lucide-react';
+import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X, Brain } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -14,6 +14,7 @@ const navigation = [
   { href: '/words', label: 'My Words', icon: BookOpen, admin: false },
   { href: '/admin/words', label: 'Words List', icon: List, admin: true },
   { href: '/sentences', label: 'Sentence', icon: TextQuote, admin: false },
+  { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
   { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
   { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList, admin: true },
   { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
@@ -45,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const overflowItems = [
+    { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
     { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
     { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
     { href: '/favorites', label: 'Favorites', icon: Heart, admin: false },
