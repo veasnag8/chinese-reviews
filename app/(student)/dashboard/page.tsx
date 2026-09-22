@@ -57,6 +57,7 @@ interface DashboardStats {
 export default function DashboardPage() {
   const [fullName, setFullName] = useState('');
   const [now, setNow] = useState<Date | null>(null);
+  const [reviewCompletedToday, setReviewCompletedToday] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     wordsCount: 0,
     sentencesCount: 0,
@@ -102,7 +103,11 @@ export default function DashboardPage() {
 
     const loadStats = async (userId: string) => {
       try {
-        const [wordsRes, sentencesRes, reviewItemsRes, reviewHistoryRes, classesRes] = await Promise.all([
+        const today = new Date();
+        const localDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const utcDateStr = today.toISOString().split('T')[0];
+
+        const [wordsRes, sentencesRes, reviewItemsRes, reviewHistoryRes, classesRes, { data: hasCompletedRpc }, { data: completionData }] = await Promise.all([
           supabase.from('words').select('id', { count: 'exact', head: true }).eq('user_id', userId),
           supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('user_id', userId),
           supabase.from('review_items').select('id, correct_count, review_count, difficulty').eq('user_id', userId),
@@ -113,7 +118,17 @@ export default function DashboardPage() {
             .eq('user_id', userId)
             .order('date', { ascending: false })
             .limit(5),
+          supabase.rpc('has_completed_daily_review'),
+          supabase
+            .from('daily_review_completions')
+            .select('id')
+            .eq('user_id', userId)
+            .in('review_date', [localDateStr, utcDateStr])
+            .maybeSingle(),
         ]);
+
+        const isCompleted = hasCompletedRpc === true || Boolean(completionData);
+        setReviewCompletedToday(isCompleted);
 
         const wordsCount = wordsRes.count || 0;
         const sentencesCount = sentencesRes.count || 0;
@@ -162,11 +177,17 @@ export default function DashboardPage() {
     };
 
     loadUser();
+    const handleReviewCompleted = () => {
+      void loadUser();
+    };
+    window.addEventListener('review-completed', handleReviewCompleted);
+
     const { data: authListener } = supabase.auth.onAuthStateChange(() => {
       loadUser();
     });
 
     return () => {
+      window.removeEventListener('review-completed', handleReviewCompleted);
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -195,16 +216,22 @@ export default function DashboardPage() {
           Add what you learned <ArrowRight size={17} />
         </Link>
       </section>
-      <section className="overflow-hidden rounded-3xl bg-[#8f1717] p-6 text-white sm:p-8">
+      <section className={`overflow-hidden rounded-3xl p-6 text-white sm:p-8 ${reviewCompletedToday ? 'bg-gradient-to-br from-emerald-800 to-teal-900' : 'bg-[#8f1717]'}`}>
         <div className="grid gap-6 md:grid-cols-[1fr_auto]">
           <div>
             <div className="mb-4 flex size-11 items-center justify-center rounded-2xl bg-white/15">
-              <Repeat2 />
+              {reviewCompletedToday ? <CheckCircle2 /> : <Repeat2 />}
             </div>
-            <p className="text-sm font-semibold tracking-wide text-red-100">TODAY&apos;S REVIEW</p>
-            <h2 className="mt-2 text-3xl font-bold">{stats.dueCount} items ready</h2>
-            <p className="mt-2 max-w-md text-red-100">
-              Keep the words from your recent classes fresh with a short, focused session.
+            <p className="text-sm font-semibold tracking-wide text-white/80">
+              {reviewCompletedToday ? 'TODAY ALREADY REVIEWED' : "TODAY'S REVIEW"}
+            </p>
+            <h2 className="mt-2 text-3xl font-bold">
+              {reviewCompletedToday ? 'Review Completed Today' : `${stats.dueCount} items ready`}
+            </h2>
+            <p className="mt-2 max-w-md text-white/80">
+              {reviewCompletedToday
+                ? "You've already completed your daily review session for today. Great job keeping your streak alive! Can review tomorrow."
+                : 'Keep the words from your recent classes fresh with a short, focused session.'}
             </p>
           </div>
           <div className="flex flex-col justify-end gap-4">
@@ -213,9 +240,9 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/review"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold text-[#991b1b]"
+              className={`inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold ${reviewCompletedToday ? 'text-emerald-800' : 'text-[#991b1b]'}`}
             >
-              Start review <ArrowRight size={17} />
+              {reviewCompletedToday ? 'View Review Words' : 'Start review'} <ArrowRight size={17} />
             </Link>
           </div>
         </div>

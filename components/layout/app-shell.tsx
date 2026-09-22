@@ -93,14 +93,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         const isReviewDay = dayOfWeek >= 1 && dayOfWeek <= 5; // Monday-Friday
         
         if (isReviewDay) {
-          const { data: reviewCompletion } = await client
-            .from('daily_review_completions')
-            .select('id')
-            .eq('user_id', auth.user.id)
-            .eq('review_date', today.toISOString().split('T')[0])
-            .maybeSingle();
-          
-          setDailyReviewCount(reviewCompletion ? 0 : 1);
+          const localDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+          const utcDateStr = today.toISOString().split('T')[0];
+
+          const [{ data: hasCompletedRpc }, { data: reviewCompletion }] = await Promise.all([
+            client.rpc('has_completed_daily_review'),
+            client
+              .from('daily_review_completions')
+              .select('id')
+              .eq('user_id', auth.user.id)
+              .in('review_date', [localDateStr, utcDateStr])
+              .maybeSingle(),
+          ]);
+
+          const isCompleted = hasCompletedRpc === true || Boolean(reviewCompletion);
+          setDailyReviewCount(isCompleted ? 0 : 1);
         } else {
           setDailyReviewCount(0);
         }
@@ -119,6 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     const timer = window.setInterval(refresh, 30000);
     window.addEventListener('focus', refresh);
     window.addEventListener('quizzes-changed', refresh);
+    window.addEventListener('review-completed', refresh);
     const { data: listener } = client.auth.onAuthStateChange(() => {
       ++request;
       setQuizCount(0);
@@ -130,6 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('quizzes-changed', refresh);
+      window.removeEventListener('review-completed', refresh);
       listener.subscription.unsubscribe();
       void client.removeChannel(quizChannel);
       void client.removeChannel(reviewChannel);

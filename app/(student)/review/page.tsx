@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, RotateCcw, Trophy, X, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { Check, CheckCircle2, PenLine, Trophy, Volume2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { meaningFromWord, pickSimilarDistractors, shuffleChoices, type QuizMeaning } from '@/lib/quiz/distractors';
+import { pickSimilarDistractors, shuffleChoices, type QuizMeaning } from '@/lib/quiz/distractors';
 
 type QuizQuestion = {
   id: string;
@@ -22,20 +23,31 @@ type QuizAnswer = {
   is_correct: boolean;
 };
 
-type WordRow = {
+type WordItem = {
+  id: string;
   chinese: string;
+  answer: string;
   pinyin?: string | null;
   khmer?: string | null;
   english?: string | null;
   category?: string | null;
   class_id?: string | null;
-  created_at?: string | null;
-  classes?: { date?: string | null } | null;
+  className?: string | null;
+};
+
+const speak = (text: string) => {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'zh-CN';
+  utterance.rate = 0.8;
+  window.speechSynthesis.speak(utterance);
 };
 
 export default function ReviewPage() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [wordPool, setWordPool] = useState<QuizMeaning[]>([]);
+  const [reviewedWords, setReviewedWords] = useState<WordItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState('');
@@ -48,45 +60,51 @@ export default function ReviewPage() {
   const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
-    const checkReviewStatus = async () => {
-      if (!supabase) return;
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) return;
-      
-      const { data } = await supabase.rpc('has_completed_daily_review');
-      setReviewCompletedToday(data === true);
-    };
-    checkReviewStatus();
-  }, []);
-
-  useEffect(() => {
-    // Don't load questions if review already completed today
-    if (reviewCompletedToday) {
-      setLoading(false);
-      return;
-    }
-
-    const loadQuestions = async () => {
+    const loadContent = async () => {
       if (!supabase) {
         setLoading(false);
         return;
       }
 
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) {
+        setLoading(false);
+        return;
+      }
+
+      // Check daily review completion status
+      const today = new Date();
+      const localDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const utcDateStr = today.toISOString().split('T')[0];
+
+      const [{ data: hasCompletedRpc }, { data: completionData }] = await Promise.all([
+        supabase.rpc('has_completed_daily_review'),
+        supabase
+          .from('daily_review_completions')
+          .select('id')
+          .eq('user_id', authData.user.id)
+          .in('review_date', [localDateStr, utcDateStr])
+          .maybeSingle(),
+      ]);
+
+      const isCompleted = hasCompletedRpc === true || Boolean(completionData);
+      setReviewCompletedToday(isCompleted);
+
+      // Load words from the last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       const dateStr = sevenDaysAgo.toISOString().split('T')[0];
 
-      const [wordsResult] = await Promise.all([
-        supabase
-          .from('words')
-          .select('chinese, pinyin, khmer, english, category, class_id, created_at, classes!words_class_id_fkey (date)')
-          .gte('created_at', dateStr)
-          .order('created_at', { ascending: false }),
-      ]);
+      const { data: wordsResult } = await supabase
+        .from('words')
+        .select('id, chinese, pinyin, khmer, english, category, class_id, created_at, classes!words_class_id_fkey (name, date)')
+        .gte('created_at', dateStr)
+        .order('created_at', { ascending: false });
 
-      const wordRows = ((wordsResult.data || []) as WordRow[])
+      const wordRows: WordItem[] = ((wordsResult || []) as any[])
         .filter((word) => word.chinese)
         .map((word) => ({
+          id: word.id,
           chinese: word.chinese,
           answer: (word.khmer || word.english || word.pinyin || '').trim(),
           pinyin: word.pinyin,
@@ -94,43 +112,46 @@ export default function ReviewPage() {
           english: word.english,
           category: word.category,
           class_id: word.class_id,
+          className: word.classes?.name || word.classes?.date || '',
         }))
         .filter((item) => item.answer);
 
-      if (wordRows.length < 2) {
-        setWordPool([]);
-        setLoading(false);
-        return;
-      }
+      setReviewedWords(wordRows);
 
-      const shuffled = [...wordRows].sort(() => Math.random() - 0.5).slice(0, 10);
-      const generatedQuestions = shuffled.map((word) => ({
-        id: crypto.randomUUID(),
-        chinese: word.chinese,
-        correct_answer: word.answer,
-        pinyin: word.pinyin,
-        khmer: word.khmer,
-        english: word.english,
-        class_id: word.class_id,
-      }));
-
-      setQuestions(generatedQuestions);
-      setWordPool(
-        shuffled.map((word) => ({
+      if (wordRows.length >= 2) {
+        const shuffled = [...wordRows].sort(() => Math.random() - 0.5).slice(0, 10);
+        const generatedQuestions = shuffled.map((word) => ({
+          id: crypto.randomUUID(),
           chinese: word.chinese,
-          answer: word.answer,
+          correct_answer: word.answer,
           pinyin: word.pinyin,
           khmer: word.khmer,
           english: word.english,
-          category: word.category,
           class_id: word.class_id,
-        }))
-      );
+        }));
+
+        setQuestions(generatedQuestions);
+        setWordPool(
+          shuffled.map((word) => ({
+            chinese: word.chinese,
+            answer: word.answer,
+            pinyin: word.pinyin,
+            khmer: word.khmer,
+            english: word.english,
+            category: word.category,
+            class_id: word.class_id,
+          }))
+        );
+      } else {
+        setQuestions([]);
+        setWordPool([]);
+      }
+
       setLoading(false);
     };
 
-    loadQuestions();
-  }, [reviewCompletedToday]);
+    loadContent();
+  }, []);
 
   const quizQuestions = useMemo(
     () =>
@@ -154,17 +175,6 @@ export default function ReviewPage() {
 
   const question = quizQuestions[questionIndex];
 
-  const restart = () => {
-    setQuestionIndex(0);
-    setSelectedAnswer('');
-    setAnswered(false);
-    setScore(0);
-    setAnswers([]);
-    setCompleted(false);
-    setCompleteError('');
-    setShowResults(false);
-  };
-
   const completeReview = async () => {
     if (!supabase || completed) return;
     setCompleteError('');
@@ -176,15 +186,32 @@ export default function ReviewPage() {
       return;
     }
 
-    const { error } = await supabase.rpc('complete_daily_review');
-    if (error) {
-      setCompleteError(error.message);
-      return;
+    const today = new Date();
+    const localDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    try {
+      const { error: rpcError } = await supabase.rpc('complete_daily_review');
+      if (rpcError) {
+        await supabase.from('daily_review_completions').insert({
+          user_id: user.id,
+          review_date: localDateStr,
+        } as never);
+      }
+    } catch {
+      try {
+        await supabase.from('daily_review_completions').insert({
+          user_id: user.id,
+          review_date: localDateStr,
+        } as never);
+      } catch {
+        // Ignore fallback error
+      }
     }
 
     setCompleted(true);
     setShowResults(true);
     setReviewCompletedToday(true);
+    window.dispatchEvent(new Event('review-completed'));
   };
 
   if (loading) return <p className="text-slate-500">Loading review...</p>;
@@ -192,11 +219,69 @@ export default function ReviewPage() {
   // Show completed message if already done today
   if (reviewCompletedToday && !showResults && !completed) {
     return (
-      <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-        <Trophy className="mx-auto text-amber-500" size={42} />
-        <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW TODAY COMPLETED</p>
-        <p className="mt-2 text-slate-600">You've already completed your daily review.</p>
-        <p className="mt-4 text-lg font-semibold text-[#b91c1c]">Can Review Tomorrow</p>
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-amber-50">
+            <Trophy className="text-amber-500" size={32} />
+          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#b91c1c]">TODAY ALREADY REVIEWED</p>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-bold">Today Already Reviewed</h1>
+          <p className="mt-2 text-slate-600">You have already completed your daily review for today.</p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-1.5 text-sm font-semibold text-[#b91c1c]">
+            <CheckCircle2 size={16} /> Can Review Tomorrow
+          </div>
+        </div>
+
+        {/* Word list that was reviewed / available for study */}
+        {reviewedWords.length > 0 && (
+          <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Words from Recent Classes (Last 7 Days)</h2>
+                <p className="text-sm text-slate-500">Review, listen, or practice writing words learned recently</p>
+              </div>
+              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {reviewedWords.length} words
+              </span>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {reviewedWords.map((word) => (
+                <div
+                  key={word.id}
+                  className="flex items-center justify-between rounded-2xl border border-stone-200 bg-[#fbfaf8] p-4 transition hover:border-red-200 hover:bg-red-50/40"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-xl font-bold">{word.chinese}</p>
+                      {word.pinyin && <p className="text-sm text-[#b91c1c]">{word.pinyin}</p>}
+                    </div>
+                    <p className="text-sm text-slate-600">
+                      {[word.khmer, word.english].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => speak(word.chinese)}
+                      className="rounded-lg p-2 text-slate-500 hover:bg-white hover:text-slate-900"
+                      title="Listen"
+                    >
+                      <Volume2 size={18} />
+                    </button>
+                    <Link
+                      href={`/writing?word=${encodeURIComponent(word.id)}`}
+                      className="rounded-lg p-2 text-[#b91c1c] hover:bg-white"
+                      title="Practice Writing"
+                    >
+                      <PenLine size={18} />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -213,13 +298,18 @@ export default function ReviewPage() {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
-          <Trophy className="mx-auto text-amber-500" size={42} />
-          <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">REVIEW COMPLETE</p>
+          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-amber-50">
+            <Trophy className="text-amber-500" size={32} />
+          </div>
+          <p className="text-xs font-bold uppercase tracking-widest text-[#b91c1c]">TODAY ALREADY REVIEWED</p>
           <h1 className="mt-2 text-3xl font-bold">
             Your score: {score} / {quizQuestions.length}
           </h1>
+          <p className="mt-2 text-slate-600">You have completed your daily review for today!</p>
           {completeError && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{completeError}</p>}
-          <p className="mt-5 text-lg font-semibold text-[#b91c1c]">Can Review Tomorrow</p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-1.5 text-sm font-semibold text-[#b91c1c]">
+            <CheckCircle2 size={16} /> Can Review Tomorrow
+          </div>
         </div>
 
         {/* Results breakdown - check answer word by word */}
@@ -227,7 +317,7 @@ export default function ReviewPage() {
           <h2 className="text-lg font-bold mb-4">Review Results</h2>
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {answers.map((answer, idx) => {
-              const q = quizQuestions.find(qq => qq.id === answer.question_id);
+              const q = quizQuestions.find((qq) => qq.id === answer.question_id);
               const isCorrect = answer.is_correct;
               return (
                 <div key={answer.question_id} className={`rounded-xl p-4 ${isCorrect ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
@@ -281,10 +371,10 @@ export default function ReviewPage() {
     setAnswers((current) => [...current, { question_id: question.id, selected_answer: choice, is_correct: isCorrect }]);
   };
 
-  const next = () => {
+  const next = async () => {
     if (questionIndex + 1 >= quizQuestions.length) {
-      // All questions answered, show results
-      setShowResults(true);
+      // All questions answered, complete review and show results
+      await completeReview();
     } else {
       setQuestionIndex((current) => current + 1);
     }
@@ -357,7 +447,7 @@ export default function ReviewPage() {
         <div className="mt-7 flex justify-end">
           {answered ? (
             <button onClick={next} className="rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white">
-              Next question
+              {questionIndex + 1 >= quizQuestions.length ? 'Finish review' : 'Next question'}
             </button>
           ) : (
             <p className="text-sm text-slate-500 self-center">Select an answer to continue</p>

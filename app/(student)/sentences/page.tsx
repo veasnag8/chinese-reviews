@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Heart, Upload, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { Heart, Upload, AlertCircle, CheckCircle, Loader2, Volume2 } from "lucide-react";
 import { fetchFavoriteIds, toggleFavorite } from "@/lib/favorites";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
