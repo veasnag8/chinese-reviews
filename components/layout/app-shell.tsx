@@ -95,18 +95,49 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (isReviewDay) {
           const localDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
           const utcDateStr = today.toISOString().split('T')[0];
+          const startOfDay = new Date();
+          startOfDay.setHours(0, 0, 0, 0);
 
-          const [{ data: hasCompletedRpc }, { data: reviewCompletion }] = await Promise.all([
-            client.rpc('has_completed_daily_review'),
-            client
-              .from('daily_review_completions')
-              .select('id')
-              .eq('user_id', auth.user.id)
-              .in('review_date', [localDateStr, utcDateStr])
-              .maybeSingle(),
-          ]);
+          let isCompleted = false;
+          if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem(`daily_review_completed_${auth.user.id}`) || localStorage.getItem('daily_review_completed_date');
+            if (stored === localDateStr || stored === utcDateStr) {
+              isCompleted = true;
+            }
+          }
 
-          const isCompleted = hasCompletedRpc === true || Boolean(reviewCompletion);
+          if (!isCompleted) {
+            try {
+              const [{ data: hasCompletedRpc }, { data: reviewCompletion }, { data: sessionData }] = await Promise.all([
+                Promise.resolve(client.rpc('has_completed_daily_review')).catch(() => ({ data: false, error: null })),
+                Promise.resolve(
+                  client
+                    .from('daily_review_completions')
+                    .select('id')
+                    .eq('user_id', auth.user.id)
+                    .in('review_date', [localDateStr, utcDateStr])
+                    .maybeSingle()
+                ).catch(() => ({ data: null, error: null })),
+                Promise.resolve(
+                  client
+                    .from('study_sessions')
+                    .select('id')
+                    .eq('user_id', auth.user.id)
+                    .gte('completed_at', startOfDay.toISOString())
+                    .limit(1)
+                    .maybeSingle()
+                ).catch(() => ({ data: null, error: null })),
+              ]);
+
+              isCompleted = hasCompletedRpc === true || Boolean(reviewCompletion) || Boolean(sessionData);
+              if (isCompleted && typeof window !== 'undefined') {
+                localStorage.setItem(`daily_review_completed_${auth.user.id}`, localDateStr);
+              }
+            } catch {
+              // Keep isCompleted
+            }
+          }
+
           setDailyReviewCount(isCompleted ? 0 : 1);
         } else {
           setDailyReviewCount(0);

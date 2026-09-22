@@ -76,18 +76,50 @@ export default function ReviewPage() {
       const today = new Date();
       const localDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       const utcDateStr = today.toISOString().split('T')[0];
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
 
-      const [{ data: hasCompletedRpc }, { data: completionData }] = await Promise.all([
-        supabase.rpc('has_completed_daily_review'),
-        supabase
-          .from('daily_review_completions')
-          .select('id')
-          .eq('user_id', authData.user.id)
-          .in('review_date', [localDateStr, utcDateStr])
-          .maybeSingle(),
-      ]);
+      // Check localStorage first
+      let isCompleted = false;
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(`daily_review_completed_${authData.user.id}`) || localStorage.getItem('daily_review_completed_date');
+        if (stored === localDateStr || stored === utcDateStr) {
+          isCompleted = true;
+        }
+      }
 
-      const isCompleted = hasCompletedRpc === true || Boolean(completionData);
+      if (!isCompleted) {
+        try {
+          const [{ data: hasCompletedRpc }, { data: completionData }, { data: sessionData }] = await Promise.all([
+            Promise.resolve(supabase.rpc('has_completed_daily_review')).catch(() => ({ data: false, error: null })),
+            Promise.resolve(
+              supabase
+                .from('daily_review_completions')
+                .select('id')
+                .eq('user_id', authData.user.id)
+                .in('review_date', [localDateStr, utcDateStr])
+                .maybeSingle()
+            ).catch(() => ({ data: null, error: null })),
+            Promise.resolve(
+              supabase
+                .from('study_sessions')
+                .select('id')
+                .eq('user_id', authData.user.id)
+                .gte('completed_at', startOfDay.toISOString())
+                .limit(1)
+                .maybeSingle()
+            ).catch(() => ({ data: null, error: null })),
+          ]);
+
+          isCompleted = hasCompletedRpc === true || Boolean(completionData) || Boolean(sessionData);
+          if (isCompleted && typeof window !== 'undefined') {
+            localStorage.setItem(`daily_review_completed_${authData.user.id}`, localDateStr);
+          }
+        } catch {
+          // Keep existing isCompleted status
+        }
+      }
+
       setReviewCompletedToday(isCompleted);
 
       // Load words from the last 7 days
@@ -189,6 +221,27 @@ export default function ReviewPage() {
     const today = new Date();
     const localDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+    // 1. Save to localStorage immediately
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`daily_review_completed_${user.id}`, localDateStr);
+        localStorage.setItem('daily_review_completed_date', localDateStr);
+      } catch {}
+    }
+
+    // 2. Insert into study_sessions (original schema table)
+    try {
+      await supabase.from('study_sessions').insert({
+        user_id: user.id,
+        items_count: quizQuestions.length,
+        correct_count: score,
+        wrong_count: Math.max(0, quizQuestions.length - score),
+        accuracy: quizQuestions.length > 0 ? Math.round((score / quizQuestions.length) * 100) : 0,
+        completed_at: new Date().toISOString(),
+      } as never);
+    } catch {}
+
+    // 3. Try daily_review_completions & RPC
     try {
       const { error: rpcError } = await supabase.rpc('complete_daily_review');
       if (rpcError) {
