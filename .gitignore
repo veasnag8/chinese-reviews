@@ -3,3 +3,7 @@ node_modules/
 out/
 dist/
 build_output*.txt
+.env
+.env*.local
+.env.production
+

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Upload, AlertCircle, CheckCircle, Loader2, X, Download, Eye, EyeOff } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle, Loader2, X, Download, Eye, EyeOff, Sparkles } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { todayISO } from "@/lib/schedule";
 import { parseCSV, parseExcel, mapWordRow, type WordImportRow, exportToExcel } from '@/lib/import';
 import { useToasts } from '@/components/ui/toast';
+import { fetchWordAutofill } from '@/lib/ai-autofill';
 
 const wordSchema = z.object({
   chinese: z.string().min(1, "Chinese is required"),
@@ -50,6 +51,7 @@ export default function AdminWordsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingWord, setEditingWord] = useState<any | null>(null);
+  const [isAutofilling, setIsAutofilling] = useState(false);
 
   // Import state
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -295,6 +297,37 @@ const onWordUpdate = async (data: WordFormData) => {
     reset();
 
     await fetchWords();
+  };
+
+  const handleAutofillWord = async (chineseVal?: string) => {
+    const text = (chineseVal || watch("chinese") || "").trim();
+    if (!text) {
+      toast({ title: "Input Required", message: "Please enter a Chinese character or word first." });
+      return;
+    }
+    setIsAutofilling(true);
+    try {
+      const res = await fetchWordAutofill(text);
+      if (res.error) {
+        toast({ title: "Auto-fill Failed", message: res.error });
+        return;
+      }
+      if (res.data) {
+        setValue("pinyin", res.data.pinyin, { shouldValidate: true, shouldDirty: true });
+        setValue("khmer", res.data.khmer, { shouldValidate: true, shouldDirty: true });
+        setValue("english", res.data.english, { shouldValidate: true, shouldDirty: true });
+        if (res.data.category && !watch("category")) setValue("category", res.data.category, { shouldValidate: true, shouldDirty: true });
+        if (res.data.partOfSpeech && !watch("partOfSpeech")) setValue("partOfSpeech", res.data.partOfSpeech, { shouldValidate: true, shouldDirty: true });
+        if (res.data.exampleSentence && !watch("exampleSentence")) setValue("exampleSentence", res.data.exampleSentence, { shouldValidate: true, shouldDirty: true });
+        if (res.data.examplePinyin && !watch("examplePinyin")) setValue("examplePinyin", res.data.examplePinyin, { shouldValidate: true, shouldDirty: true });
+        if (res.data.exampleKhmer && !watch("exampleKhmer")) setValue("exampleKhmer", res.data.exampleKhmer, { shouldValidate: true, shouldDirty: true });
+        toast({ title: "Auto-fill Success", message: "✨ Auto-filled Pinyin, Khmer & English with AI!" });
+      }
+    } catch (err: any) {
+      toast({ title: "Auto-fill Error", message: err.message || "Failed to auto-fill" });
+    } finally {
+      setIsAutofilling(false);
+    }
   };
 
   const deleteWord = async (wordId: string) => {
@@ -638,9 +671,31 @@ const onWordUpdate = async (data: WordFormData) => {
               className="space-y-4"
             >
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  Chinese
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium">
+                    Chinese
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isAutofilling}
+                    onClick={() => handleAutofillWord()}
+                    className="h-7 text-xs px-2.5 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 hover:from-violet-500/20 hover:to-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                  >
+                    {isAutofilling ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-indigo-600" />
+                        <span>AI Auto-filling...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-600 dark:text-indigo-400" />
+                        <span>✨ AI Auto-fill (Gemini)</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
 
                 <Input
                   placeholder="Enter Chinese character(s)"

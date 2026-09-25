@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Heart, Upload, AlertCircle, CheckCircle, Loader2, Volume2, X, Edit2, Trash2 } from "lucide-react";
+import { Heart, Upload, AlertCircle, CheckCircle, Loader2, Volume2, X, Edit2, Trash2, Sparkles } from "lucide-react";
 import { fetchFavoriteIds, toggleFavorite } from "@/lib/favorites";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
 import { parseCSV, parseExcel, mapSentenceRow, type SentenceImportRow } from '@/lib/import';
+import { fetchSentenceAutofill } from '@/lib/ai-autofill';
 
 const sentenceSchema = z.object({
   chineseSentence: z.string().min(1, "Sentence is required"),
@@ -85,6 +86,8 @@ export default function SentencesPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
   const [importSuccess, setImportSuccess] = useState(0);
+  const [isAutofillingAdd, setIsAutofillingAdd] = useState(false);
+  const [isAutofillingEdit, setIsAutofillingEdit] = useState(false);
   const pendingFavoriteIds = useRef(new Set<string>());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ITEMS_PER_PAGE = 12;
@@ -322,6 +325,61 @@ export default function SentencesPage() {
     await fetchSentences();
   };
 
+  const handleAutofillAdd = async () => {
+    const text = (watch("chineseSentence") || "").trim();
+    if (!text) {
+      setFavoriteError("Please enter a Chinese sentence first.");
+      return;
+    }
+    setIsAutofillingAdd(true);
+    setFavoriteError("");
+    try {
+      const res = await fetchSentenceAutofill(text);
+      if (res.error) {
+        setFavoriteError(res.error);
+        return;
+      }
+      if (res.data) {
+        setValue("pinyin", res.data.pinyin, { shouldValidate: true, shouldDirty: true });
+        setValue("khmerTranslation", res.data.khmerTranslation, { shouldValidate: true, shouldDirty: true });
+        setValue("englishTranslation", res.data.englishTranslation, { shouldValidate: true, shouldDirty: true });
+      }
+    } catch (err: any) {
+      setFavoriteError(err.message || "Failed to auto-fill sentence");
+    } finally {
+      setIsAutofillingAdd(false);
+    }
+  };
+
+  const handleAutofillEdit = async () => {
+    const text = (editFormData.chineseSentence || "").trim();
+    if (!text) {
+      setEditError("Please enter a Chinese sentence first.");
+      return;
+    }
+    setIsAutofillingEdit(true);
+    setEditError("");
+    try {
+      const res = await fetchSentenceAutofill(text);
+      if (res.error) {
+        setEditError(res.error);
+        return;
+      }
+      if (res.data) {
+        setEditFormData(prev => ({
+          ...prev,
+          pinyin: res.data?.pinyin || prev.pinyin,
+          khmerTranslation: res.data?.khmerTranslation || prev.khmerTranslation,
+          englishTranslation: res.data?.englishTranslation || prev.englishTranslation,
+        }));
+      }
+    } catch (err: any) {
+      setEditError(err.message || "Failed to auto-fill sentence");
+    } finally {
+      setIsAutofillingEdit(false);
+    }
+  };
+
   const deleteSentence = async (sentenceId: string) => {
     if (!window.confirm("Are you sure you want to delete this sentence?")) return;
 
@@ -413,7 +471,32 @@ export default function SentencesPage() {
                 </span>
               </label>
             </div>
-            <textarea {...register("chineseSentence")} required placeholder="Chinese sentence" className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" />
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">Chinese Sentence *</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isAutofillingAdd}
+                  onClick={handleAutofillAdd}
+                  className="h-7 text-xs px-2.5 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 hover:from-violet-500/20 hover:to-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                >
+                  {isAutofillingAdd ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin text-indigo-600" />
+                      <span>AI Auto-filling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>✨ AI Auto-fill (Gemini)</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+              <textarea {...register("chineseSentence")} required placeholder="Chinese sentence" className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" />
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <input {...register("pinyin")} placeholder="Pinyin" className="rounded-md border border-input bg-background px-3 py-2" />
               <input {...register("khmerTranslation")} placeholder="Khmer translation" className="rounded-md border border-input bg-background px-3 py-2" />
@@ -470,13 +553,35 @@ export default function SentencesPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-sm font-medium">Chinese Sentence *</label>
-                    <button
-                      type="button"
-                      onClick={() => speak(editFormData.chineseSentence, editFormData.audioUrl)}
-                      className="inline-flex items-center gap-1 text-xs text-[#b91c1c] font-semibold hover:underline"
-                    >
-                      <Volume2 size={14} /> Test voice
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isAutofillingEdit}
+                        onClick={handleAutofillEdit}
+                        className="h-7 text-xs px-2 bg-gradient-to-r from-violet-500/10 to-indigo-500/10 hover:from-violet-500/20 hover:to-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800"
+                      >
+                        {isAutofillingEdit ? (
+                          <>
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin text-indigo-600" />
+                            <span>Auto-filling...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3 mr-1 text-indigo-600 dark:text-indigo-400" />
+                            <span>✨ AI Auto-fill</span>
+                          </>
+                        )}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => speak(editFormData.chineseSentence, editFormData.audioUrl)}
+                        className="inline-flex items-center gap-1 text-xs text-[#b91c1c] font-semibold hover:underline"
+                      >
+                        <Volume2 size={14} /> Test voice
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     required
