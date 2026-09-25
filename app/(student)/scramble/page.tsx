@@ -43,7 +43,7 @@ type TokenItem = {
   text: string;
 };
 
-type DifficultyMode = 'easy' | 'medium' | 'hard';
+type DifficultyMode = 'medium' | 'hard';
 
 function tokenizeChinese(sentence: string): string[] {
   const clean = sentence.trim().replace(/[。！？!?.,;:；：、]$/, '');
@@ -113,7 +113,7 @@ export default function SentenceScramblePage() {
   const [allSentences, setAllSentences] = useState<GameSentence[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
-  const [difficulty, setDifficulty] = useState<DifficultyMode>('easy');
+  const [difficulty, setDifficulty] = useState<DifficultyMode>('medium');
   const [loading, setLoading] = useState(true);
 
   // Game Play State
@@ -458,7 +458,7 @@ export default function SentenceScramblePage() {
           </select>
 
           <div className="inline-flex rounded-xl border border-stone-200 bg-stone-50 p-0.5 text-xs font-semibold">
-            {(['easy', 'medium', 'hard'] as DifficultyMode[]).map((mode) => (
+            {(['medium', 'hard'] as DifficultyMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setDifficulty(mode)}
@@ -537,9 +537,6 @@ export default function SentenceScramblePage() {
             )}
             {difficulty !== 'hard' && !currentSentence.khmer_translation && currentSentence.english_translation && (
               <p className="text-xl font-bold text-slate-800">{currentSentence.english_translation}</p>
-            )}
-            {difficulty === 'easy' && currentSentence.pinyin && (
-              <p className="text-sm font-medium text-slate-500 pt-1">({currentSentence.pinyin})</p>
             )}
             {difficulty === 'hard' && (
               <p className="text-sm text-slate-500 italic">Click audio above to hear the sentence</p>
