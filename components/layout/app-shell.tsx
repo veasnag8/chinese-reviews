@@ -42,10 +42,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: '/daily', label: 'Daily', icon: CalendarDays },
     { href: '/words', label: 'My Words', icon: BookOpen },
     { href: '/sentences', label: 'Sentence', icon: TextQuote },
-    { href: '/quizzes', label: 'Quiz', icon: ListChecks },
   ];
 
   const overflowItems = [
+    { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
     { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
     { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
     { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
