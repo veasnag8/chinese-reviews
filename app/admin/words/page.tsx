@@ -330,7 +330,12 @@ const onWordUpdate = async (data: WordFormData) => {
     }
   };
 
-  const deleteWord = async (wordId: string) => {
+  const deleteWord = async (wordId: string, chinese?: string) => {
+    const label = chinese ? `"${chinese}"` : "this word";
+    if (!window.confirm(`Are you sure you want to delete ${label}? This cannot be undone.`)) {
+      return;
+    }
+
     const { error } = await supabase
       .from("words")
       .delete()
@@ -338,9 +343,11 @@ const onWordUpdate = async (data: WordFormData) => {
 
     if (error) {
       console.error(error);
+      toast({ title: "Delete Error", message: error.message || "Failed to delete word" });
       return;
     }
 
+    toast({ title: "Deleted", message: `Successfully deleted ${label}.` });
     await fetchWords();
   };
 
@@ -949,7 +956,7 @@ reset({
                               variant="destructive"
                               type="button"
                               onClick={() =>
-                                deleteWord(word.id)
+                                deleteWord(word.id, word.chinese)
                               }
                             >
                               Delete

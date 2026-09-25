@@ -50,3 +50,4 @@ export async function fetchSentenceAutofill(chineseSentence: string): Promise<{ 
     return { error: err?.message || 'Network error while fetching AI auto-fill.' };
   }
 }
+

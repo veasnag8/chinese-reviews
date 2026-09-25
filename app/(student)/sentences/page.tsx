@@ -380,8 +380,11 @@ export default function SentencesPage() {
     }
   };
 
-  const deleteSentence = async (sentenceId: string) => {
-    if (!window.confirm("Are you sure you want to delete this sentence?")) return;
+  const deleteSentence = async (sentenceId: string, sentenceText?: string) => {
+    const label = sentenceText ? `"${sentenceText}"` : "this sentence";
+    if (!window.confirm(`Are you sure you want to delete ${label}? This cannot be undone.`)) {
+      return;
+    }
 
     const { error } = await supabase
       .from("sentences")
@@ -763,7 +766,7 @@ export default function SentencesPage() {
                                   size="sm"
                                   variant="destructive"
                                   type="button"
-                                  onClick={() => deleteSentence(sentence.id)}
+                                  onClick={() => deleteSentence(sentence.id, sentence.chinese_sentence)}
                                   className="h-8 px-2.5 text-xs"
                                 >
                                   <Trash2 size={13} className="mr-1" /> Delete

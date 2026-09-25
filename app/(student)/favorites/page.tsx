@@ -52,6 +52,9 @@ export default function FavoritesPage() {
   };
 
   const removeFavorite = async (favId: string) => {
+    if (!window.confirm("Remove this item from your favorites?")) {
+      return;
+    }
     await supabase.from("favorites").delete().eq("id", favId);
     setFavorites((prev) => prev.filter((f) => f.id !== favId));
   };

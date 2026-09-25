@@ -150,7 +150,12 @@ export default function ClassesPage() {
     setShowCreateForm(false);
   };
 
-  const deleteClass = async (classId: string) => {
+  const deleteClass = async (classId: string, className?: string) => {
+    const label = className ? `"${className}"` : "this class";
+    if (!window.confirm(`Are you sure you want to delete ${label}? This cannot be undone.`)) {
+      return;
+    }
+
     const { error } = await supabase
       .from("classes")
       .delete()
