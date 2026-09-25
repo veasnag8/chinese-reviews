@@ -118,14 +118,13 @@ export default function DashboardPage() {
         }
 
         const [wordsRes, sentencesRes, reviewItemsRes, reviewHistoryRes, classesRes, { data: hasCompletedRpc }, { data: completionData }, { data: sessionData }] = await Promise.all([
-          supabase.from('words').select('id', { count: 'exact', head: true }).eq('user_id', userId),
-          supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+          supabase.from('words').select('id', { count: 'exact', head: true }),
+          supabase.from('sentences').select('id', { count: 'exact', head: true }),
           supabase.from('review_items').select('id, correct_count, review_count, difficulty').eq('user_id', userId),
           supabase.from('review_history').select('correct').eq('user_id', userId),
           supabase
             .from('classes')
             .select('id, name, date, teacher, lesson_number')
-            .eq('user_id', userId)
             .order('date', { ascending: false })
             .limit(5),
           Promise.resolve(supabase.rpc('has_completed_daily_review')).catch(() => ({ data: false, error: null })),
@@ -173,8 +172,8 @@ export default function DashboardPage() {
         const classesWithCounts = await Promise.all(
           classes.map(async (c) => {
             const [wordsCnt, sentencesCnt] = await Promise.all([
-              supabase.from('words').select('id', { count: 'exact', head: true }).eq('class_id', c.id).eq('user_id', userId),
-              supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('class_id', c.id).eq('user_id', userId),
+              supabase.from('words').select('id', { count: 'exact', head: true }).eq('class_id', c.id),
+              supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('class_id', c.id),
             ]);
             return {
               id: c.id,

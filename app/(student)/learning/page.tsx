@@ -102,7 +102,6 @@ export default function LearningPage() {
       const { data: classData } = await supabase
         .from('classes')
         .select('id, name, date')
-        .eq('user_id', auth.user.id)
         .order('date', { ascending: false });
 
       if (!classData || classData.length === 0) {
@@ -115,13 +114,13 @@ export default function LearningPage() {
       const classesWithCounts = await Promise.all(
         (classData as ClassRow[]).map(async (c) => {
           const [wordsRes, sentencesRes] = await Promise.all([
-            supabase.from('words').select('id', { count: 'exact', head: true }).eq('class_id', c.id).eq('user_id', auth.user.id),
-            supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('class_id', c.id).eq('user_id', auth.user.id),
+            supabase.from('words').select('id', { count: 'exact', head: true }).eq('class_id', c.id),
+            supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('class_id', c.id),
           ]);
           return {
             id: c.id,
-            name: c.name,
-            date: c.date,
+            name: c.name || '',
+            date: c.date || '',
             wordCount: wordsRes.count || 0,
             sentenceCount: sentencesRes.count || 0,
           };
@@ -147,13 +146,11 @@ export default function LearningPage() {
           .from('words')
           .select('id, chinese, pinyin, khmer, english, class_id, classes!words_class_id_fkey (name, date)')
           .eq('class_id', selectedClass.id)
-          .eq('user_id', auth.user.id)
           .order('created_at', { ascending: true }),
         supabase
           .from('sentences')
-          .select('id, chinese, pinyin, khmer, english, class_id')
+          .select('id, chinese_sentence, pinyin, khmer_translation, english_translation, class_id')
           .eq('class_id', selectedClass.id)
-          .eq('user_id', auth.user.id)
           .order('created_at', { ascending: true }),
       ]);
 
@@ -171,13 +168,13 @@ export default function LearningPage() {
         }));
 
       const mappedSentences: LearningSentence[] = ((sentencesRes.data || []) as any[])
-        .filter((s) => s.chinese)
+        .filter((s) => s.chinese_sentence || s.chinese)
         .map((s) => ({
           id: s.id,
-          chinese: s.chinese,
+          chinese: s.chinese_sentence || s.chinese || '',
           pinyin: s.pinyin || '',
-          khmer: s.khmer || '',
-          english: s.english || '',
+          khmer: s.khmer_translation || s.khmer || '',
+          english: s.english_translation || s.english || '',
           classId: s.class_id,
         }));
 
