@@ -14,6 +14,7 @@ type WordItem = {
   className: string;
   hsk: string;
   favorite: boolean;
+  isNew: boolean;
 };
 
 type WordRow = {
@@ -23,7 +24,16 @@ type WordRow = {
   khmer: string | null;
   english: string | null;
   hsk_level: number | null;
+  created_at?: string | null;
   classes?: { name: string | null; date: string | null } | null;
+};
+
+const isWithinLast24Hours = (createdAt?: string | null) => {
+  if (!createdAt) return false;
+  const time = new Date(createdAt).getTime();
+  if (Number.isNaN(time)) return false;
+  const now = Date.now();
+  return now - time <= 24 * 60 * 60 * 1000 && now - time >= 0;
 };
 
 const speak = (text: string) => {
@@ -66,7 +76,7 @@ export default function WordsPage() {
 
       const { data, error } = await supabase
         .from('words')
-        .select('id, chinese, pinyin, khmer, english, hsk_level, classes!words_class_id_fkey (name, date)')
+        .select('id, chinese, pinyin, khmer, english, hsk_level, created_at, classes!words_class_id_fkey (name, date)')
         .order('created_at', { ascending: false });
 
       if (error) setFavoriteError(error.message);
@@ -87,6 +97,7 @@ export default function WordsPage() {
                   ? `HSK ${word.hsk_level}`
                   : '',
             favorite: favoriteIds.words.has(word.id),
+            isNew: isWithinLast24Hours(word.created_at),
           }))
       );
       setLoading(false);
@@ -193,7 +204,14 @@ export default function WordsPage() {
               >
               <div className="flex justify-between">
                 <div>
-                  <h2 className="text-3xl font-semibold">{w.chinese}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-3xl font-semibold">{w.chinese}</h2>
+                    {w.isNew && (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#b91c1c] border border-red-200 animate-pulse">
+                        NEW
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 text-red-700">{w.pinyin || 'Pinyin not added'}</p>
                 </div>
                 <button

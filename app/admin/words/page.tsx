@@ -31,6 +31,14 @@ const wordSchema = z.object({
 
 type WordFormData = z.infer<typeof wordSchema>;
 
+const isWithinLast24Hours = (createdAt?: string | null) => {
+  if (!createdAt) return false;
+  const time = new Date(createdAt).getTime();
+  if (Number.isNaN(time)) return false;
+  const now = Date.now();
+  return now - time <= 24 * 60 * 60 * 1000 && now - time >= 0;
+};
+
 export default function AdminWordsPage() {
   const [user, setUser] = useState<string | null>(null);
   const [access, setAccess] = useState<"checking" | "allowed" | "denied">("checking");
@@ -818,7 +826,14 @@ const onWordUpdate = async (data: WordFormData) => {
                       className="hover:bg-muted/50"
                     >
                       <td className="p-3">
-                        {word.chinese}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-foreground">{word.chinese}</span>
+                          {isWithinLast24Hours(word.created_at) && (
+                            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#b91c1c] border border-red-200 animate-pulse shrink-0">
+                              NEW
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-3">
