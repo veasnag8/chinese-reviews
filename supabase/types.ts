@@ -195,7 +195,6 @@ export interface Database {
       for_you_assignments: {
         Row: {
           id: string;
-          student_id: string;
           created_by: string;
           content_type: "word" | "sentence";
           chinese: string;
@@ -208,7 +207,6 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          student_id: string;
           created_by: string;
           content_type: "word" | "sentence";
           chinese: string;
@@ -220,7 +218,6 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
-          student_id?: string;
           content_type?: "word" | "sentence";
           chinese?: string;
           pinyin?: string | null;
