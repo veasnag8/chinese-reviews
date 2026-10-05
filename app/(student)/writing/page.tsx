@@ -19,6 +19,7 @@ const speak = (text: string) => {
 function WritingPage() {
   const searchParams = useSearchParams();
   const wordParam = searchParams.get('word');
+  const assignmentParam = searchParams.get('assignment');
   const singleMode = searchParams.get('single') === '1';
   const writerElementRef = useRef<HTMLDivElement>(null);
   const writerRef = useRef<HanziWriter | null>(null);
@@ -40,16 +41,45 @@ function WritingPage() {
   const [searching, setSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [charIndex, setCharIndex] = useState(0);
+  const [assignmentUnavailable, setAssignmentUnavailable] = useState(false);
 
   const word = words[wordIndex] ?? words[0] ?? initialWords[0];
   const characters = [...word.chinese];
   const character = characters[charIndex];
-  const isSingleMode = singleMode && wordParam;
+  const isSingleMode = Boolean((singleMode && wordParam) || assignmentParam);
   const isLastChar = charIndex === characters.length - 1;
 
   useEffect(() => {
     const loadWords = async () => {
       if (!supabase) return;
+
+      if (assignmentParam) {
+        const { data } = await (supabase
+          .from('for_you_assignments') as any)
+          .select('id, chinese, pinyin, khmer, english, content_type, expires_at')
+          .eq('id', assignmentParam)
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle();
+
+        if (!data?.chinese) {
+          setAssignmentUnavailable(true);
+          return;
+        }
+
+        setAssignmentUnavailable(false);
+        setWords([{
+          id: data.id,
+          chinese: data.chinese,
+          pinyin: data.pinyin || '—',
+          khmer: data.khmer || '—',
+          english: data.english || '—',
+          className: 'For You',
+          hsk: data.content_type === 'sentence' ? 'Sentence' : 'Assigned word',
+        }]);
+        setWordIndex(0);
+        setCharIndex(0);
+        return;
+      }
 
       const { data } = await supabase
         .from('words')
@@ -83,7 +113,7 @@ function WritingPage() {
     };
 
     loadWords();
-  }, [wordParam]);
+  }, [assignmentParam, wordParam]);
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
@@ -267,6 +297,16 @@ function WritingPage() {
 
   const next = () => setWordIndex((index) => (index + 1) % words.length);
 
+  if (assignmentUnavailable) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">This practice is no longer available</h1>
+        <p className="mt-2 text-slate-500">It may have expired or been removed by your admin.</p>
+        <a href="/for-you" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white"><ArrowLeft size={16} /> Back to For You</a>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
       <div className="flex items-end justify-between gap-4">
@@ -276,7 +316,7 @@ function WritingPage() {
           {isSingleMode && (
             <p className="mt-1 text-sm text-sky-600 flex items-center gap-1">
               <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700">Single Word Mode</span>
-              <span>Practicing only this word from My Words</span>
+              <span>{assignmentParam ? 'Practicing your assigned content' : 'Practicing only this word from My Words'}</span>
             </p>
           )}
         </div>
@@ -451,10 +491,10 @@ function WritingPage() {
         </button>
         {isSingleMode && (
           <a
-            href="/words"
+            href={assignmentParam ? '/for-you' : '/words'}
             className="ml-auto inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-stone-50"
           >
-            <ArrowLeft size={16} /> Back to My Words
+            <ArrowLeft size={16} /> Back to {assignmentParam ? 'For You' : 'My Words'}
           </a>
         )}
         {!isSingleMode && (

@@ -5,6 +5,7 @@ type Tables =
   | "classes"
   | "words"
   | "sentences"
+  | "for_you_assignments"
   | "categories"
   | "hsk_levels"
   | "review_items"
@@ -188,6 +189,44 @@ export interface Database {
           audio_url?: string;
           audio_provider?: string;
           audio_voice?: string;
+          updated_at?: string;
+        };
+      };
+      for_you_assignments: {
+        Row: {
+          id: string;
+          student_id: string;
+          created_by: string;
+          content_type: "word" | "sentence";
+          chinese: string;
+          pinyin: string | null;
+          khmer: string | null;
+          english: string | null;
+          expires_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          created_by: string;
+          content_type: "word" | "sentence";
+          chinese: string;
+          pinyin?: string | null;
+          khmer?: string | null;
+          english?: string | null;
+          expires_at: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          student_id?: string;
+          content_type?: "word" | "sentence";
+          chinese?: string;
+          pinyin?: string | null;
+          khmer?: string | null;
+          english?: string | null;
+          expires_at?: string;
           updated_at?: string;
         };
       };

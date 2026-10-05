@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, CircleUserRound, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X, Brain } from 'lucide-react';
+import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, PenLine, Settings, Sparkles, TextQuote, Users, X, Brain, Gift } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -12,6 +12,8 @@ const navigation = [
   { href: '/learning', label: 'Learn', icon: Brain, admin: false },
   { href: '/daily', label: 'Daily', icon: CalendarDays, admin: false },
   { href: '/words', label: 'My Words', icon: BookOpen, admin: false },
+  { href: '/for-you', label: 'For You', icon: Gift, admin: false },
+  { href: '/admin/for-you', label: 'Assign For You', icon: Gift, admin: true },
   { href: '/admin/words', label: 'Words List', icon: List, admin: true },
   { href: '/sentences', label: 'Sentence', icon: TextQuote, admin: false },
   { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
@@ -46,6 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const overflowItems = [
     { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
+    { href: '/for-you', label: 'For You', icon: Gift, admin: false },
     { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
     { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
     { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
@@ -54,6 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
     { href: '/settings', label: 'Settings', icon: Settings, admin: false },
     { href: '/admin/words', label: 'Words List', icon: List, admin: true },
+    { href: '/admin/for-you', label: 'Assign For You', icon: Gift, admin: true },
     { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList, admin: true },
     { href: '/admin/users', label: 'User List', icon: Users, admin: true },
   ];
