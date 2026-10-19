@@ -71,7 +71,7 @@ export default function AdminForYouPage() {
       setAssignments((assignmentsResult.data || []) as Assignment[]);
     }
     const submissionsResult = await (supabase.from('homework_submissions') as any)
-      .select('id, assignment_id, user_id, answer_image_path, status, submitted_at, checked_at, profiles(full_name, email), for_you_assignments(chinese)')
+      .select('id, assignment_id, user_id, answer_image_path, status, submitted_at, checked_at, profiles!homework_submissions_user_id_fkey(full_name, email), for_you_assignments(chinese)')
       .order('submitted_at', { ascending: false });
     if (submissionsResult.error) {
       setMessage(submissionsResult.error.message || 'Unable to load homework submissions.');
