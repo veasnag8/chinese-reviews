@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { BookOpen, Clock3, Gift, PenLine, RefreshCw, TextQuote, Volume2 } from 'lucide-react';
+import { BookOpen, Clock3, NotebookPen, PenLine, RefreshCw, TextQuote, Volume2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Assignment = {
@@ -54,7 +54,7 @@ export default function ForYouPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Chosen for you</p><h1 className="mt-1 text-3xl font-bold">For You</h1><p className="mt-2 text-slate-500">Words and sentences assigned by your admin appear here for every user.</p></div>
+        <div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Your assignments</p><h1 className="mt-1 text-3xl font-bold">Homework</h1><p className="mt-2 text-slate-500">Complete the words and sentences assigned by your teacher before they expire.</p></div>
         <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"><RefreshCw size={17} /> Refresh</button>
       </div>
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -70,7 +70,7 @@ export default function ForYouPage() {
           </article>
         ))}</div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center"><Gift className="mx-auto text-stone-300" size={40} /><h2 className="mt-3 text-lg font-bold">Nothing assigned right now</h2><p className="mt-1 text-sm text-slate-500">New practice from your admin will appear here.</p></div>
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center"><NotebookPen className="mx-auto text-stone-300" size={40} /><h2 className="mt-3 text-lg font-bold">No homework right now</h2><p className="mt-1 text-sm text-slate-500">New homework from your teacher will appear here.</p></div>
       )}
     </div>
   );

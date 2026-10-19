@@ -73,7 +73,7 @@ function WritingPage() {
           pinyin: data.pinyin || '—',
           khmer: data.khmer || '—',
           english: data.english || '—',
-          className: 'For You',
+          className: 'Homework',
           hsk: data.content_type === 'sentence' ? 'Sentence' : 'Assigned word',
         }]);
         setWordIndex(0);
@@ -302,7 +302,7 @@ function WritingPage() {
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-slate-900">This practice is no longer available</h1>
         <p className="mt-2 text-slate-500">It may have expired or been removed by your admin.</p>
-        <a href="/for-you" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white"><ArrowLeft size={16} /> Back to For You</a>
+        <a href="/for-you" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white"><ArrowLeft size={16} /> Back to Homework</a>
       </div>
     );
   }
@@ -494,7 +494,7 @@ function WritingPage() {
             href={assignmentParam ? '/for-you' : '/words'}
             className="ml-auto inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-stone-50"
           >
-            <ArrowLeft size={16} /> Back to {assignmentParam ? 'For You' : 'My Words'}
+            <ArrowLeft size={16} /> Back to {assignmentParam ? 'Homework' : 'My Words'}
           </a>
         )}
         {!isSingleMode && (

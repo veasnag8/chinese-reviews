@@ -61,6 +61,7 @@ export type SentenceImportRow = {
   khmer_translation?: string;
   english_translation?: string;
   class_id?: string;
+  sentence_type?: 'single' | 'conversation';
 };
 
 export function mapWordRow(row: string[], headers: string[]): WordImportRow | null {
@@ -86,6 +87,10 @@ export function mapSentenceRow(row: string[], headers: string[]): SentenceImport
   
   const chinese = obj['chinese'] || obj['sentence'] || obj['chinese_sentence'] || '';
   if (!chinese) return null;
+  const rawType = (obj['type'] || obj['sentence_type'] || '').toLowerCase();
+  const sentenceType = rawType === 'conversation' || rawType === 'dialogue' || rawType === 'dialog'
+    ? 'conversation'
+    : 'single';
   
   return {
     chinese_sentence: chinese,
@@ -93,6 +98,7 @@ export function mapSentenceRow(row: string[], headers: string[]): SentenceImport
     khmer_translation: obj['khmer'] || obj['km'] || obj['khmer_translation'] || undefined,
     english_translation: obj['english'] || obj['en'] || obj['english_translation'] || undefined,
     class_id: obj['class_id'] || obj['class'] || undefined,
+    sentence_type: sentenceType,
   };
 }
 

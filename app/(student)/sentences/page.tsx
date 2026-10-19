@@ -15,6 +15,7 @@ import { parseCSV, parseExcel, mapSentenceRow, type SentenceImportRow } from '@/
 import { fetchSentenceAutofill } from '@/lib/ai-autofill';
 
 const sentenceSchema = z.object({
+  sentenceType: z.enum(["single", "conversation"]),
   chineseSentence: z.string().min(1, "Sentence is required"),
   pinyin: z.string().optional(),
   khmerTranslation: z.string().optional(),
@@ -63,12 +64,14 @@ export default function SentencesPage() {
 
   const [user, setUser] = useState<string | null>(null);
   const [sentences, setSentences] = useState<any[]>([]);
+  const [activeType, setActiveType] = useState<'single' | 'conversation'>('single');
   const [classes, setClasses] = useState<any[]>([]);
   const [isStaff, setIsStaff] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [editingSentence, setEditingSentence] = useState<any | null>(null);
   const [editFormData, setEditFormData] = useState({
+    sentenceType: "single" as 'single' | 'conversation',
     chineseSentence: "",
     pinyin: "",
     khmerTranslation: "",
@@ -121,6 +124,7 @@ export default function SentencesPage() {
         khmer_translation: s.khmer_translation || null,
         english_translation: s.english_translation || null,
         class_id: s.class_id || null,
+        sentence_type: s.sentence_type || 'single',
         user_id: user,
       }));
 
@@ -133,6 +137,7 @@ export default function SentencesPage() {
         pinyin: s.pinyin || '',
         khmer_translation: s.khmer_translation || '',
         english_translation: s.english_translation || '',
+        sentence_type: s.sentence_type || 'single',
         classes: { name: s.class_id || 'Imported' },
       })), ...current]);
     } catch (e: any) {
@@ -251,6 +256,7 @@ export default function SentencesPage() {
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<SentenceFormData>({
     resolver: zodResolver(sentenceSchema),
+    defaultValues: { sentenceType: 'single' },
   });
 
   const onAddSentence = async (data: SentenceFormData) => {
@@ -261,6 +267,7 @@ export default function SentencesPage() {
     const { error } = await supabase
       .from("sentences")
       .insert({
+        sentence_type: data.sentenceType,
         chinese_sentence: data.chineseSentence,
         pinyin: data.pinyin,
         khmer_translation: data.khmerTranslation,
@@ -277,6 +284,8 @@ export default function SentencesPage() {
     }
 
     setFormState("success");
+    setActiveType(data.sentenceType);
+    setCurrentPage(1);
     reset();
     setIsAdding(false);
 
@@ -286,6 +295,7 @@ export default function SentencesPage() {
   const startEditing = (sentence: any) => {
     setEditingSentence(sentence);
     setEditFormData({
+      sentenceType: sentence.sentence_type === 'conversation' ? 'conversation' : 'single',
       chineseSentence: sentence.chinese_sentence || "",
       pinyin: sentence.pinyin || "",
       khmerTranslation: sentence.khmer_translation || "",
@@ -305,6 +315,7 @@ export default function SentencesPage() {
 
     const { error } = await (supabase.from("sentences") as any)
       .update({
+        sentence_type: editFormData.sentenceType,
         chinese_sentence: editFormData.chineseSentence.trim(),
         pinyin: editFormData.pinyin.trim() || null,
         khmer_translation: editFormData.khmerTranslation.trim() || null,
@@ -322,6 +333,8 @@ export default function SentencesPage() {
     }
 
     setEditingSentence(null);
+    setActiveType(editFormData.sentenceType);
+    setCurrentPage(1);
     await fetchSentences();
   };
 
@@ -404,6 +417,10 @@ export default function SentencesPage() {
     return null;
   }
 
+  const filteredSentences = sentences.filter(
+    (sentence) => (sentence.sentence_type || 'single') === activeType
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto p-4">
@@ -453,6 +470,17 @@ export default function SentencesPage() {
             <h3 className="text-lg font-semibold">Add sentence</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-medium">
+                Type
+                <Select
+                  value={watch("sentenceType") || "single"}
+                  options={[
+                    { value: "single", label: "Single Sentence" },
+                    { value: "conversation", label: "Conversation" },
+                  ]}
+                  onChange={(event) => setValue("sentenceType", event.target.value as 'single' | 'conversation')}
+                />
+              </label>
+              <label className="text-sm font-medium">
                 Class
                 <Select
                   value={watch("classId") || ""}
@@ -498,7 +526,7 @@ export default function SentencesPage() {
                   )}
                 </Button>
               </div>
-              <textarea {...register("chineseSentence")} required placeholder="Chinese sentence" className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" />
+              <textarea {...register("chineseSentence")} required placeholder={watch("sentenceType") === 'conversation' ? "A: 你好！\nB: 你好！" : "Chinese sentence"} className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2" />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <input {...register("pinyin")} placeholder="Pinyin" className="rounded-md border border-input bg-background px-3 py-2" />
@@ -537,6 +565,17 @@ export default function SentencesPage() {
               )}
 
               <form onSubmit={saveEditSentence} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Type</label>
+                  <select
+                    value={editFormData.sentenceType}
+                    onChange={(e) => setEditFormData({ ...editFormData, sentenceType: e.target.value as 'single' | 'conversation' })}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="single">Single Sentence</option>
+                    <option value="conversation">Conversation</option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Class</label>
                   <select
@@ -663,9 +702,29 @@ export default function SentencesPage() {
           </div>
         )}
 
-        {sentences.length === 0 ? (
+        <div className="mb-4 flex w-full gap-1 rounded-xl border border-stone-200 bg-stone-100 p-1 sm:w-fit" role="tablist" aria-label="Sentence type">
+          {(['single', 'conversation'] as const).map((type) => {
+            const count = sentences.filter((sentence) => (sentence.sentence_type || 'single') === type).length;
+            const selected = activeType === type;
+            return (
+              <button
+                key={type}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => { setActiveType(type); setCurrentPage(1); }}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${selected ? 'bg-white text-[#b91c1c] shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                {type === 'single' ? 'Single Sentences' : 'Conversations'}
+                <span className={`rounded-full px-2 py-0.5 text-xs ${selected ? 'bg-red-50 text-[#b91c1c]' : 'bg-stone-200 text-slate-600'}`}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredSentences.length === 0 ? (
           <EmptyState>
-            <p>No sentences yet</p>
+            <p>No {activeType === 'single' ? 'single sentences' : 'conversations'} yet</p>
             <p className="text-sm mt-2">
               Add your first sentence to get started
             </p>
@@ -686,7 +745,7 @@ export default function SentencesPage() {
                 </thead>
 
                 <tbody className="divide-y divide-stone-100">
-                  {sentences
+                  {filteredSentences
                     .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
                     .map((sentence: any) => (
                       <tr
@@ -705,7 +764,7 @@ export default function SentencesPage() {
                               <Volume2 size={18} />
                             </button>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-base text-slate-900">
+                              <span className="whitespace-pre-line font-semibold text-base text-slate-900">
                                 {sentence.chinese_sentence}
                               </span>
                               {isWithinLast24Hours(sentence.created_at) && (
@@ -781,7 +840,7 @@ export default function SentencesPage() {
               </table>
             </div>
 
-            {Math.ceil(sentences.length / ITEMS_PER_PAGE) > 1 && (
+            {Math.ceil(filteredSentences.length / ITEMS_PER_PAGE) > 1 && (
               <div className="flex items-center justify-center gap-2 mt-6">
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -791,11 +850,11 @@ export default function SentencesPage() {
                   Previous
                 </button>
                 <span className="text-sm font-medium text-slate-700">
-                  Page {currentPage} of {Math.ceil(sentences.length / ITEMS_PER_PAGE)}
+                  Page {currentPage} of {Math.ceil(filteredSentences.length / ITEMS_PER_PAGE)}
                 </span>
                 <button
-                  onClick={() => setCurrentPage((p) => Math.min(Math.ceil(sentences.length / ITEMS_PER_PAGE), p + 1))}
-                  disabled={currentPage === Math.ceil(sentences.length / ITEMS_PER_PAGE)}
+                  onClick={() => setCurrentPage((p) => Math.min(Math.ceil(filteredSentences.length / ITEMS_PER_PAGE), p + 1))}
+                  disabled={currentPage === Math.ceil(filteredSentences.length / ITEMS_PER_PAGE)}
                   className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
                 >
                   Next

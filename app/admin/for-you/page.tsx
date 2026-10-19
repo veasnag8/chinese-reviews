@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { BookOpen, Clock3, Gift, Loader2, RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react';
+import { BookOpen, Clock3, Loader2, NotebookPen, RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { fetchSentenceAutofill, fetchWordAutofill } from '@/lib/ai-autofill';
 
@@ -82,7 +82,7 @@ export default function AdminForYouPage() {
     });
     if (error) setMessage(error.message);
     else {
-      setMessage('Assignment added to every user’s For You page.');
+      setMessage('Homework assigned to every user.');
       setForm(emptyForm());
       await loadData();
     }
@@ -121,7 +121,7 @@ export default function AdminForYouPage() {
   };
 
   const remove = async (assignment: Assignment) => {
-    if (!supabase || !window.confirm(`Delete “${assignment.chinese}” from every user’s For You list?`)) return;
+    if (!supabase || !window.confirm(`Delete “${assignment.chinese}” from every user’s homework?`)) return;
     const { error } = await (supabase.from('for_you_assignments') as any).delete().eq('id', assignment.id);
     if (error) setMessage(error.message);
     else setAssignments((current) => current.filter((item) => item.id !== assignment.id));
@@ -131,9 +131,9 @@ export default function AdminForYouPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Shared practice</p>
-          <h1 className="mt-1 text-3xl font-bold">Assign For You</h1>
-          <p className="mt-2 text-slate-500">Send a word or sentence to every user. It disappears from their pages after the expiry time.</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Homework management</p>
+          <h1 className="mt-1 text-3xl font-bold">Create Homework</h1>
+          <p className="mt-2 text-slate-500">Assign a word or sentence to every student. It disappears after the expiry time.</p>
         </div>
         <button type="button" onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"><RefreshCw size={17} /> Refresh</button>
       </div>
@@ -141,7 +141,7 @@ export default function AdminForYouPage() {
       {message && <p role="status" className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">{message}</p>}
 
       <form onSubmit={submit} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="mb-5 flex items-center gap-2"><Gift className="text-[#b91c1c]" size={20} /><h2 className="text-lg font-bold">New assignment</h2></div>
+        <div className="mb-5 flex items-center gap-2"><NotebookPen className="text-[#b91c1c]" size={20} /><h2 className="text-lg font-bold">New homework</h2></div>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm font-semibold text-slate-700">Content type
             <select value={form.contentType} onChange={(event) => setForm({ ...form, contentType: event.target.value as 'word' | 'sentence' })} className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 font-normal outline-none focus:border-[#b91c1c]"><option value="word">Word</option><option value="sentence">Sentence</option></select>
@@ -161,7 +161,7 @@ export default function AdminForYouPage() {
           <label className="text-sm font-semibold text-slate-700">English<input value={form.english} onChange={(event) => setForm({ ...form, english: event.target.value })} className="mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2.5 font-normal" /></label>
           <label className="text-sm font-semibold text-slate-700">Expires at<input required type="datetime-local" min={localDateTime(new Date())} value={form.expiresAt} onChange={(event) => setForm({ ...form, expiresAt: event.target.value })} className="mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2.5 font-normal" /></label>
         </div>
-        <button disabled={saving} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"><Send size={17} /> {saving ? 'Assigning...' : 'Assign to all users'}</button>
+        <button disabled={saving} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"><Send size={17} /> {saving ? 'Creating...' : 'Create homework'}</button>
       </form>
 
       <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
@@ -172,7 +172,7 @@ export default function AdminForYouPage() {
               const expired = new Date(assignment.expires_at).getTime() <= Date.now();
               return <tr key={assignment.id} className="border-b border-stone-100 last:border-0"><td className="p-4 font-semibold">All users</td><td className="p-4 capitalize"><span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{assignment.content_type === 'word' ? <BookOpen size={13} /> : <Clock3 size={13} />}{assignment.content_type}</span></td><td className="p-4"><p className="max-w-sm text-lg font-semibold">{assignment.chinese}</p><p className="text-xs text-slate-500">{assignment.pinyin || assignment.english || ''}</p></td><td className="p-4 text-slate-600">{new Date(assignment.expires_at).toLocaleString()}</td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${expired ? 'bg-stone-100 text-slate-500' : 'bg-emerald-50 text-emerald-700'}`}>{expired ? 'Expired' : 'Active'}</span></td><td className="p-4"><button type="button" onClick={() => void remove(assignment)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700"><Trash2 size={13} /> Delete</button></td></tr>;
             })}
-            {!loading && assignments.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No assignments yet.</td></tr>}
+            {!loading && assignments.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500">No homework yet.</td></tr>}
           </tbody>
         </table>
       </div>
