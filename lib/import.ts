@@ -62,6 +62,8 @@ export type SentenceImportRow = {
   english_translation?: string;
   class_id?: string;
   sentence_type?: 'single' | 'conversation';
+  speaker_one_name?: string;
+  speaker_two_name?: string;
 };
 
 export function mapWordRow(row: string[], headers: string[]): WordImportRow | null {
@@ -91,6 +93,9 @@ export function mapSentenceRow(row: string[], headers: string[]): SentenceImport
   const sentenceType = rawType === 'conversation' || rawType === 'dialogue' || rawType === 'dialog'
     ? 'conversation'
     : 'single';
+  const speakerOneName = obj['speaker_one_name'] || obj['speaker_1'] || obj['speaker_a'] || '';
+  const speakerTwoName = obj['speaker_two_name'] || obj['speaker_2'] || obj['speaker_b'] || '';
+  if (sentenceType === 'conversation' && (!speakerOneName || !speakerTwoName)) return null;
   
   return {
     chinese_sentence: chinese,
@@ -99,6 +104,8 @@ export function mapSentenceRow(row: string[], headers: string[]): SentenceImport
     english_translation: obj['english'] || obj['en'] || obj['english_translation'] || undefined,
     class_id: obj['class_id'] || obj['class'] || undefined,
     sentence_type: sentenceType,
+    speaker_one_name: speakerOneName || undefined,
+    speaker_two_name: speakerTwoName || undefined,
   };
 }
 

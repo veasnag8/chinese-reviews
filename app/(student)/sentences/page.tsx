@@ -16,12 +16,18 @@ import { fetchSentenceAutofill } from '@/lib/ai-autofill';
 
 const sentenceSchema = z.object({
   sentenceType: z.enum(["single", "conversation"]),
+  speakerOneName: z.string().optional(),
+  speakerTwoName: z.string().optional(),
   chineseSentence: z.string().min(1, "Sentence is required"),
   pinyin: z.string().optional(),
   khmerTranslation: z.string().optional(),
   englishTranslation: z.string().optional(),
   audioUrl: z.string().optional(),
   classId: z.string().min(1, "Class is required"),
+}).superRefine((data, ctx) => {
+  if (data.sentenceType !== 'conversation') return;
+  if (!data.speakerOneName?.trim()) ctx.addIssue({ code: 'custom', path: ['speakerOneName'], message: 'Speaker 1 name is required' });
+  if (!data.speakerTwoName?.trim()) ctx.addIssue({ code: 'custom', path: ['speakerTwoName'], message: 'Speaker 2 name is required' });
 });
 
 type SentenceFormData = z.infer<typeof sentenceSchema>;
@@ -72,6 +78,8 @@ export default function SentencesPage() {
   const [editingSentence, setEditingSentence] = useState<any | null>(null);
   const [editFormData, setEditFormData] = useState({
     sentenceType: "single" as 'single' | 'conversation',
+    speakerOneName: "",
+    speakerTwoName: "",
     chineseSentence: "",
     pinyin: "",
     khmerTranslation: "",
@@ -125,6 +133,8 @@ export default function SentencesPage() {
         english_translation: s.english_translation || null,
         class_id: s.class_id || null,
         sentence_type: s.sentence_type || 'single',
+        speaker_one_name: s.speaker_one_name || null,
+        speaker_two_name: s.speaker_two_name || null,
         user_id: user,
       }));
 
@@ -138,6 +148,8 @@ export default function SentencesPage() {
         khmer_translation: s.khmer_translation || '',
         english_translation: s.english_translation || '',
         sentence_type: s.sentence_type || 'single',
+        speaker_one_name: s.speaker_one_name || '',
+        speaker_two_name: s.speaker_two_name || '',
         classes: { name: s.class_id || 'Imported' },
       })), ...current]);
     } catch (e: any) {
@@ -256,7 +268,7 @@ export default function SentencesPage() {
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<SentenceFormData>({
     resolver: zodResolver(sentenceSchema),
-    defaultValues: { sentenceType: 'single' },
+    defaultValues: { sentenceType: 'single', speakerOneName: '', speakerTwoName: '' },
   });
 
   const onAddSentence = async (data: SentenceFormData) => {
@@ -268,6 +280,8 @@ export default function SentencesPage() {
       .from("sentences")
       .insert({
         sentence_type: data.sentenceType,
+        speaker_one_name: data.sentenceType === 'conversation' ? data.speakerOneName?.trim() : null,
+        speaker_two_name: data.sentenceType === 'conversation' ? data.speakerTwoName?.trim() : null,
         chinese_sentence: data.chineseSentence,
         pinyin: data.pinyin,
         khmer_translation: data.khmerTranslation,
@@ -296,6 +310,8 @@ export default function SentencesPage() {
     setEditingSentence(sentence);
     setEditFormData({
       sentenceType: sentence.sentence_type === 'conversation' ? 'conversation' : 'single',
+      speakerOneName: sentence.speaker_one_name || "",
+      speakerTwoName: sentence.speaker_two_name || "",
       chineseSentence: sentence.chinese_sentence || "",
       pinyin: sentence.pinyin || "",
       khmerTranslation: sentence.khmer_translation || "",
@@ -309,6 +325,10 @@ export default function SentencesPage() {
   const saveEditSentence = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSentence || !editFormData.chineseSentence.trim()) return;
+    if (editFormData.sentenceType === 'conversation' && (!editFormData.speakerOneName.trim() || !editFormData.speakerTwoName.trim())) {
+      setEditError('Both speaker names are required for a conversation.');
+      return;
+    }
 
     setIsSavingEdit(true);
     setEditError("");
@@ -316,6 +336,8 @@ export default function SentencesPage() {
     const { error } = await (supabase.from("sentences") as any)
       .update({
         sentence_type: editFormData.sentenceType,
+        speaker_one_name: editFormData.sentenceType === 'conversation' ? editFormData.speakerOneName.trim() : null,
+        speaker_two_name: editFormData.sentenceType === 'conversation' ? editFormData.speakerTwoName.trim() : null,
         chinese_sentence: editFormData.chineseSentence.trim(),
         pinyin: editFormData.pinyin.trim() || null,
         khmer_translation: editFormData.khmerTranslation.trim() || null,
@@ -502,6 +524,19 @@ export default function SentencesPage() {
                 </span>
               </label>
             </div>
+            {watch("sentenceType") === 'conversation' && (
+              <div className="grid gap-3 rounded-xl border border-red-100 bg-red-50/50 p-4 sm:grid-cols-2">
+                <label className="text-sm font-medium">
+                  Speaker 1 Name *
+                  <input {...register("speakerOneName")} required placeholder="Example: David" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2" />
+                </label>
+                <label className="text-sm font-medium">
+                  Speaker 2 Name *
+                  <input {...register("speakerTwoName")} required placeholder="Example: Yamamoto" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2" />
+                </label>
+                <p className="text-xs text-muted-foreground sm:col-span-2">Enter the names of both people in this conversation.</p>
+              </div>
+            )}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium">Chinese Sentence *</label>
@@ -576,6 +611,16 @@ export default function SentencesPage() {
                     <option value="conversation">Conversation</option>
                   </select>
                 </div>
+                {editFormData.sentenceType === 'conversation' && (
+                  <div className="grid gap-3 rounded-xl border border-red-100 bg-red-50/50 p-4 sm:grid-cols-2">
+                    <label className="block text-sm font-medium">Speaker 1 Name *
+                      <input required value={editFormData.speakerOneName} onChange={(e) => setEditFormData({ ...editFormData, speakerOneName: e.target.value })} className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" placeholder="Example: David" />
+                    </label>
+                    <label className="block text-sm font-medium">Speaker 2 Name *
+                      <input required value={editFormData.speakerTwoName} onChange={(e) => setEditFormData({ ...editFormData, speakerTwoName: e.target.value })} className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm" placeholder="Example: Yamamoto" />
+                    </label>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium mb-1">Class</label>
                   <select
@@ -692,7 +737,7 @@ export default function SentencesPage() {
                   <Button
                     type="submit"
                     variant="primary"
-                    disabled={isSavingEdit || !editFormData.chineseSentence.trim()}
+                    disabled={isSavingEdit || !editFormData.chineseSentence.trim() || (editFormData.sentenceType === 'conversation' && (!editFormData.speakerOneName.trim() || !editFormData.speakerTwoName.trim()))}
                   >
                     {isSavingEdit ? "Saving Changes..." : "Save Changes"}
                   </Button>
@@ -764,9 +809,16 @@ export default function SentencesPage() {
                               <Volume2 size={18} />
                             </button>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="whitespace-pre-line font-semibold text-base text-slate-900">
-                                {sentence.chinese_sentence}
-                              </span>
+                              <div>
+                                {sentence.sentence_type === 'conversation' && (
+                                  <p className="mb-1 text-xs font-semibold text-[#b91c1c]">
+                                    {sentence.speaker_one_name} ↔ {sentence.speaker_two_name}
+                                  </p>
+                                )}
+                                <span className="whitespace-pre-line font-semibold text-base text-slate-900">
+                                  {sentence.chinese_sentence}
+                                </span>
+                              </div>
                               {isWithinLast24Hours(sentence.created_at) && (
                                 <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#b91c1c] border border-red-200 animate-pulse shrink-0">
                                   NEW
