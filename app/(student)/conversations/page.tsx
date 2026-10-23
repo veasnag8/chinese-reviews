@@ -128,26 +128,24 @@ export default function ConversationsPage() {
             return (
               <article key={conversation.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between gap-3 border-b border-stone-100 bg-stone-50 px-4 py-3 sm:px-6"><span className="inline-flex items-center gap-2 font-semibold text-slate-800"><BookOpenText size={18} className="text-[#b91c1c]" />{conversation.classes?.name || 'Conversation'}</span>{conversation.classes?.date && <span className="text-xs text-slate-500">{conversation.classes.date}</span>}</div>
-                <div className="space-y-5 bg-gradient-to-b from-stone-50/70 to-white p-4 sm:p-6">
+                <div className="space-y-1 bg-[#fffefa] p-4 sm:p-7">
                   {chineseLines.map((line, index) => {
                     const { speaker, text } = splitSpeaker(line);
                     const speakerIndex = speaker ? Math.max(0, speakerNames.indexOf(speaker)) : index % 2;
-                    const isRight = speakerIndex % 2 === 1;
                     const theme = speakerThemes[speakerIndex % speakerThemes.length];
                     const pinyin = splitSpeaker(pinyinLines[index] || '').text;
                     const rowKey = `${conversation.id}-${index}`;
                     const language = visibleTranslations[rowKey];
                     const translation = language === 'khmer' ? translationAt(conversation.khmer_translation, index) : language === 'english' ? translationAt(conversation.english_translation, index) : '';
                     return (
-                      <div key={rowKey} className={`flex items-end gap-2.5 ${isRight ? 'flex-row-reverse' : ''}`}>
-                        <div className={`flex size-11 shrink-0 items-center justify-center rounded-full px-2 text-center text-xs font-bold text-white shadow-sm ${theme.avatar}`}>{speaker || index + 1}</div>
-                        <div className={`min-w-0 max-w-[85%] sm:max-w-[72%] ${isRight ? 'items-end' : 'items-start'}`}>
-                          <p className={`mb-1 px-1 text-xs font-bold ${isRight ? 'text-right' : ''} ${theme.name}`}>{speaker || `Speaker ${speakerIndex + 1}`}</p>
-                          <div role="button" tabIndex={0} aria-expanded={expandedRows.has(rowKey)} onClick={() => toggleRow(rowKey)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRow(rowKey); } }} className={`relative cursor-pointer rounded-2xl border px-4 py-3 shadow-sm transition hover:shadow-md ${isRight ? 'rounded-br-md' : 'rounded-bl-md'} ${theme.bubble}`}>
-                            {pinyin && <p className={`text-sm leading-relaxed ${theme.pinyin}`}>{pinyin}</p>}
-                            <div className="mt-0.5 flex items-start justify-between gap-3"><p className="text-lg font-semibold leading-relaxed sm:text-xl">{text}</p><button type="button" onClick={(event) => { event.stopPropagation(); speakChinese(text); }} aria-label={`Read ${text}`} className="shrink-0 rounded-full p-2 text-current opacity-70 hover:bg-white/15 hover:opacity-100"><Volume2 size={18} /></button></div>
+                      <div key={rowKey} className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-start gap-3 rounded-xl px-1 py-4 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-5 sm:px-3">
+                        <div className={`mt-1 flex min-h-9 items-center justify-center rounded-xl px-2 py-1.5 text-center text-sm font-bold text-white shadow-sm ${theme.avatar}`}>{speaker || index + 1}</div>
+                        <div className="min-w-0 max-w-4xl">
+                          <div role="button" tabIndex={0} aria-expanded={expandedRows.has(rowKey)} onClick={() => toggleRow(rowKey)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRow(rowKey); } }} className="group cursor-pointer rounded-xl px-1 py-0.5 outline-none transition hover:bg-white focus-visible:ring-2 focus-visible:ring-orange-200">
+                            {pinyin && <p className="text-base font-medium leading-relaxed tracking-wide text-[#e79775] sm:text-lg">{pinyin}</p>}
+                            <div className="mt-0.5 flex items-start justify-between gap-3"><p className="font-serif text-2xl font-semibold leading-relaxed tracking-wide text-slate-950 sm:text-3xl">{text}</p><button type="button" onClick={(event) => { event.stopPropagation(); speakChinese(text); }} aria-label={`Read ${text}`} className="shrink-0 rounded-full p-2 text-slate-400 opacity-70 hover:bg-orange-50 hover:text-orange-600 hover:opacity-100"><Volume2 size={19} /></button></div>
                           </div>
-                          {expandedRows.has(rowKey) && <div className={`mt-2 flex gap-2 ${isRight ? 'justify-end' : ''}`}>
+                          {expandedRows.has(rowKey) && <div className="mt-2 flex gap-2">
                             <button type="button" onClick={() => toggleTranslation(rowKey, 'khmer')} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold ${language === 'khmer' ? theme.active : 'border border-stone-200 bg-white text-slate-600 hover:bg-stone-50'}`}><Languages size={14} /> Khmer</button>
                             <button type="button" onClick={() => toggleTranslation(rowKey, 'english')} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold ${language === 'english' ? theme.active : 'border border-stone-200 bg-white text-slate-600 hover:bg-stone-50'}`}><Languages size={14} /> English</button>
                           </div>}
