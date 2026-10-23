@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, MessageCircle, NotebookPen, PenLine, Settings, TextQuote, Users, X, Brain } from 'lucide-react';
+import { BookOpen, Brain, CalendarDays, ChartNoAxesColumnIncreasing, ChevronDown, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, MessageCircle, NotebookPen, PenLine, Settings, ShieldCheck, TextQuote, Users, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -13,13 +13,10 @@ const navigation = [
   { href: '/daily', label: 'Daily', icon: CalendarDays, admin: false },
   { href: '/words', label: 'My Words', icon: BookOpen, admin: false },
   { href: '/for-you', label: 'Homework', icon: NotebookPen, admin: false },
-  { href: '/admin/for-you', label: 'Create Homework', icon: NotebookPen, admin: true },
-  { href: '/admin/words', label: 'Words List', icon: List, admin: true },
   { href: '/sentences', label: 'Sentence', icon: TextQuote, admin: false },
   { href: '/conversations', label: 'Conversation', icon: MessageCircle, admin: false },
   { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
   { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
-  { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList, admin: true },
   { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
   { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
   { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
@@ -27,6 +24,13 @@ const navigation = [
   { href: '/progress', label: 'Progress', icon: ChartNoAxesColumnIncreasing, admin: false },
   { href: '/admin/users', label: 'User List', icon: Users, admin: true },
   { href: '/settings', label: 'Settings', icon: Settings, admin: false },
+];
+
+const managementItems = [
+  { href: '/admin/for-you', label: 'Create Homework', icon: NotebookPen },
+  { href: '/admin/words', label: 'Word List', icon: List },
+  { href: '/sentences', label: 'Add Sentence', icon: TextQuote },
+  { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -43,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [conversationCount, setConversationCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(pathname.startsWith('/admin'));
 
   const mobileNavItems = [
     { href: '/dashboard', label: 'Dashboard', icon: House },
@@ -63,9 +68,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: '/progress', label: 'Progress', icon: ChartNoAxesColumnIncreasing, admin: false },
     { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
     { href: '/settings', label: 'Settings', icon: Settings, admin: false },
-    { href: '/admin/words', label: 'Words List', icon: List, admin: true },
-    { href: '/admin/for-you', label: 'Create Homework', icon: NotebookPen, admin: true },
-    { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList, admin: true },
     { href: '/admin/users', label: 'User List', icon: Users, admin: true },
   ];
 
@@ -301,7 +303,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   return <div className="min-h-screen bg-[#f7f6f3] text-slate-900">
     <aside className="fixed inset-y-0 hidden w-64 border-r border-stone-200 bg-white px-4 py-6 md:flex md:flex-col">
       <Link href="/dashboard" className="mb-9 flex shrink-0 items-center gap-3 px-2"><span className="grid size-9 place-items-center rounded-xl bg-[#b91c1c] text-lg text-white">汉</span><span className="font-semibold tracking-wide">CHINESE REVIEW</span></Link>
-      <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-scroll overscroll-contain pr-2 [scrollbar-gutter:stable]">{navigation.map(({ href, label, icon: Icon, admin }) => { const count = notificationCount(href); return <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && isStaffLoaded && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{label}{count > 0 && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{count}</span>}</Link>; })}</nav>
+      <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-scroll overscroll-contain pr-2 [scrollbar-gutter:stable]">
+        {navigation.map(({ href, label, icon: Icon, admin }) => { const count = notificationCount(href); return <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && isStaffLoaded && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{label}{count > 0 && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{count}</span>}</Link>; })}
+        {isStaffLoaded && isStaff && <div className="pt-1">
+          <button type="button" onClick={() => setAdminMenuOpen((open) => !open)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${managementItems.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ? 'bg-amber-50 text-amber-800' : 'text-slate-700 hover:bg-stone-100'}`}><ShieldCheck size={18} />Management Admin<ChevronDown size={16} className={`ml-auto transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} /></button>
+          {adminMenuOpen && <div className="ml-4 mt-1 space-y-1 border-l-2 border-amber-200 pl-2">{managementItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-amber-100 font-semibold text-amber-900' : 'text-slate-600 hover:bg-stone-100'}`}><Icon size={16} />{label}</Link>)}</div>}
+        </div>}
+      </nav>
     </aside>
     <main className="pb-24 md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6 md:p-8">{children}</div></main>
     
@@ -360,6 +368,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               ) : null
             ))}
+            {isStaffLoaded && isStaff && <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-2">
+              <button type="button" onClick={() => setAdminMenuOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-semibold text-amber-900"><ShieldCheck size={20} />Management Admin<ChevronDown size={17} className={`ml-auto transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} /></button>
+              {adminMenuOpen && <div className="space-y-1">{managementItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-amber-200 text-amber-950' : 'text-slate-700 hover:bg-white'}`}><Icon size={18} />{label}</Link>)}</div>}
+            </div>}
             <hr className="my-2 border-stone-200" />
             <button onClick={logout} className="flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium text-red-600 hover:bg-red-50 w-full">
               <LogOut size={20} />
