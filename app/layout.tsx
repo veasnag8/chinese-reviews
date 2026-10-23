@@ -1,6 +1,13 @@
 import "./globals.css";
 import { QuizNotificationToaster } from "@/components/quiz-notification-toaster";
 import type { Viewport } from "next";
+import { Noto_Sans_Khmer } from "next/font/google";
+
+const notoSansKhmer = Noto_Sans_Khmer({
+  subsets: ["khmer", "latin"],
+  display: "swap",
+  variable: "--font-khmer",
+});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -40,7 +47,7 @@ export default function Root({
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
       </head>
-      <body className="bg-background text-foreground">
+      <body className={`${notoSansKhmer.variable} bg-background font-sans text-foreground`}>
         {children}
         <QuizNotificationToaster />
       </body>

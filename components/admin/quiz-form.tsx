@@ -696,9 +696,9 @@ export function QuizForm({ initial }: QuizFormProps) {
       </section>
 
       <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="font-bold">Questions ({questions.length})</h2>
-          <Button type="button" variant="outline" onClick={addQuestion}>
+          <Button type="button" variant="outline" onClick={addQuestion} className="min-h-10 px-4 shadow-sm">
             <Plus size={15} /> Add question
           </Button>
         </div>
@@ -864,8 +864,8 @@ export function QuizForm({ initial }: QuizFormProps) {
         ))}
       </section>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" disabled={saving}>
+      <div className="grid grid-cols-2 gap-3 border-t border-stone-200 pt-5 sm:flex sm:items-center">
+        <Button type="submit" disabled={saving} className="min-h-11 w-full bg-[#b91c1c] px-5 text-white shadow-sm hover:bg-[#991b1b] sm:w-auto">
           {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Save Quiz'}
         </Button>
         <Button
@@ -873,6 +873,7 @@ export function QuizForm({ initial }: QuizFormProps) {
           variant="outline"
           disabled={saving}
           onClick={() => router.push('/admin/quizzes')}
+          className="min-h-11 w-full border-stone-300 bg-white px-5 text-slate-700 shadow-sm hover:bg-stone-50 sm:w-auto"
         >
           Cancel
         </Button>

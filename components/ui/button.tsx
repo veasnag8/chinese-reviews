@@ -8,7 +8,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const buttonVariants =
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
 export function Button(props: ButtonProps) {
   const {
@@ -36,10 +36,10 @@ export function Button(props: ButtonProps) {
   };
 
   const sizeStyles = {
-    default: "",
-    sm: "h-8 px-3 rounded-md",
-    lg: "h-10 px-8 rounded-md",
-    icon: "h-10 w-10",
+    default: "min-h-10 px-4 py-2",
+    sm: "min-h-9 px-3 py-1.5",
+    lg: "min-h-11 px-8 py-2.5",
+    icon: "size-10 p-0",
   };
 
   return (

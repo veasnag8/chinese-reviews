@@ -59,7 +59,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["var(--font-khmer)", "Noto Sans Khmer", "Khmer OS System", "system-ui", "sans-serif"],
         display: ["DM Sans", "sans-serif"],
         chinese: ["SimSun", "serif"],
       },
