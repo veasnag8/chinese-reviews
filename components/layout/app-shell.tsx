@@ -36,6 +36,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [displayName, setDisplayName] = useState('User');
   const [quizCount, setQuizCount] = useState(0);
   const [dailyReviewCount, setDailyReviewCount] = useState(0);
+  const [homeworkCount, setHomeworkCount] = useState(0);
+  const [wordCount, setWordCount] = useState(0);
+  const [sentenceCount, setSentenceCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const mobileNavItems = [
@@ -62,7 +66,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: '/admin/users', label: 'User List', icon: Users, admin: true },
   ];
 
-  const overflowNotificationCount = quizCount + dailyReviewCount;
+  const notificationCount = (href: string) => {
+    if (href === '/quizzes') return quizCount;
+    if (href === '/review') return dailyReviewCount;
+    if (href === '/for-you') return homeworkCount;
+    if (href === '/words') return wordCount;
+    if (href === '/sentences') return sentenceCount;
+    return 0;
+  };
+
+  const overflowNotificationCount = overflowItems.reduce((total, item) => total + notificationCount(item.href), 0);
 
   useEffect(() => {
     const client = supabase;
@@ -78,13 +91,36 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (!auth.user) {
           setQuizCount(0);
           setDailyReviewCount(0);
+          setHomeworkCount(0);
+          setWordCount(0);
+          setSentenceCount(0);
+          setCurrentUserId('');
           return;
         }
-        const [quizzes, submissions] = await Promise.all([
+        setCurrentUserId(auth.user.id);
+        const nowIso = new Date().toISOString();
+        const wordsSeenKey = `words_seen_at_${auth.user.id}`;
+        const sentencesSeenKey = `sentences_seen_at_${auth.user.id}`;
+        const wordsSeenAt = window.localStorage.getItem(wordsSeenKey) || nowIso;
+        const sentencesSeenAt = window.localStorage.getItem(sentencesSeenKey) || nowIso;
+        if (!window.localStorage.getItem(wordsSeenKey)) window.localStorage.setItem(wordsSeenKey, nowIso);
+        if (!window.localStorage.getItem(sentencesSeenKey)) window.localStorage.setItem(sentencesSeenKey, nowIso);
+        const [quizzes, submissions, homework, homeworkSubmissions, newWords, newSentences] = await Promise.all([
           client.from('quizzes').select('id, start_at, deadline').eq('status', 'active'),
           client.from('quiz_submissions').select('quiz_id').eq('user_id', auth.user.id).eq('status', 'submitted'),
+          client.from('for_you_assignments').select('id').lte('starts_at', nowIso).gt('expires_at', nowIso),
+          client.from('homework_submissions').select('assignment_id').eq('user_id', auth.user.id),
+          client.from('words').select('id', { count: 'exact', head: true }).gt('created_at', wordsSeenAt),
+          client.from('sentences').select('id', { count: 'exact', head: true }).gt('created_at', sentencesSeenAt),
         ]);
-        if (!active || version !== request || quizzes.error || submissions.error) return;
+        if (!active || version !== request) return;
+        if (!newWords.error) setWordCount(newWords.count || 0);
+        if (!newSentences.error) setSentenceCount(newSentences.count || 0);
+        if (!homework.error && !homeworkSubmissions.error) {
+          const completedHomework = new Set((homeworkSubmissions.data || []).map((row: { assignment_id: string }) => row.assignment_id));
+          setHomeworkCount((homework.data || []).filter((item: { id: string }) => !completedHomework.has(item.id)).length);
+        }
+        if (quizzes.error || submissions.error) return;
         const submitted = new Set((submissions.data || []).map((row: { quiz_id: string }) => row.quiz_id));
         const now = Date.now();
         setQuizCount((quizzes.data || []).filter((quiz: { id: string; start_at: string | null; deadline: string | null }) =>
@@ -160,6 +196,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     const reviewChannel = client.channel('daily-review-count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_review_completions' }, refresh)
       .subscribe();
+    const learningChannel = client.channel('learning-menu-counts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'words' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sentences' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'for_you_assignments' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'homework_submissions' }, refresh)
+      .subscribe();
     const timer = window.setInterval(refresh, 30000);
     window.addEventListener('focus', refresh);
     window.addEventListener('quizzes-changed', refresh);
@@ -168,6 +210,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       ++request;
       setQuizCount(0);
       setDailyReviewCount(0);
+      setHomeworkCount(0);
+      setWordCount(0);
+      setSentenceCount(0);
       window.setTimeout(() => { if (active) void refresh(); }, 0);
     });
     return () => {
@@ -179,8 +224,22 @@ export function AppShell({ children }: { children: ReactNode }) {
       listener.subscription.unsubscribe();
       void client.removeChannel(quizChannel);
       void client.removeChannel(reviewChannel);
+      void client.removeChannel(learningChannel);
     };
   }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const now = new Date().toISOString();
+    if (pathname === '/words') {
+      window.localStorage.setItem(`words_seen_at_${currentUserId}`, now);
+      setWordCount(0);
+    }
+    if (pathname === '/sentences') {
+      window.localStorage.setItem(`sentences_seen_at_${currentUserId}`, now);
+      setSentenceCount(0);
+    }
+  }, [currentUserId, pathname]);
 
   const logout = async () => {
     await supabase?.auth.signOut();
@@ -227,7 +286,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return <div className="min-h-screen bg-[#f7f6f3] text-slate-900">
     <aside className="fixed inset-y-0 hidden w-64 border-r border-stone-200 bg-white px-4 py-6 md:flex md:flex-col">
       <Link href="/dashboard" className="mb-9 flex shrink-0 items-center gap-3 px-2"><span className="grid size-9 place-items-center rounded-xl bg-[#b91c1c] text-lg text-white">汉</span><span className="font-semibold tracking-wide">CHINESE REVIEW</span></Link>
-      <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-scroll overscroll-contain pr-2 [scrollbar-gutter:stable]">{navigation.map(({ href, label, icon: Icon, admin }) => <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && isStaffLoaded && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{label}{(href === '/quizzes' && quizCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{quizCount}</span>}{(href === '/review' && dailyReviewCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{dailyReviewCount}</span>}</Link>)}</nav>
+      <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-scroll overscroll-contain pr-2 [scrollbar-gutter:stable]">{navigation.map(({ href, label, icon: Icon, admin }) => { const count = notificationCount(href); return <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && isStaffLoaded && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{label}{count > 0 && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{count}</span>}</Link>; })}</nav>
     </aside>
     <main className="pb-24 md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6 md:p-8">{children}</div></main>
     
@@ -243,8 +302,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Icon size={19} />
           <span>
             {label}
-            {(href === '/quizzes' && quizCount > 0) && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{quizCount}</span>}
-            {(href === '/review' && dailyReviewCount > 0) && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{dailyReviewCount}</span>}
+            {notificationCount(href) > 0 && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{notificationCount(href)}</span>}
           </span>
         </Link>
       ))}
@@ -283,8 +341,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <Icon size={20} />
                   {label}
-                  {(href === '/quizzes' && quizCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-2 py-1 text-xs font-semibold text-white">{quizCount}</span>}
-                  {(href === '/review' && dailyReviewCount > 0) && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-2 py-1 text-xs font-semibold text-white">{dailyReviewCount}</span>}
+                  {notificationCount(href) > 0 && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-2 py-1 text-xs font-semibold text-white">{notificationCount(href)}</span>}
                 </Link>
               ) : null
             ))}
