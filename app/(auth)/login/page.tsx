@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -18,6 +18,27 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const restoreSession = async () => {
+      if (!supabase) {
+        if (active) setCheckingSession(false);
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      if (data.session) {
+        router.replace(redirect);
+        router.refresh();
+        return;
+      }
+      setCheckingSession(false);
+    };
+    void restoreSession();
+    return () => { active = false; };
+  }, [redirect, router]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -42,6 +63,8 @@ function LoginForm() {
       setBusy(false);
     }
   };
+
+  if (checkingSession) return <LoginLoading />;
 
   return (
     <main className="login-safe-area min-h-[100dvh] overflow-hidden bg-[#f7f3ef] lg:p-7">

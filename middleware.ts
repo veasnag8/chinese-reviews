@@ -41,11 +41,18 @@ export async function middleware(request: NextRequest) {
     userExists = !!profile;
   }
 
-  const protectedPaths = ['/dashboard', '/words', '/sentences', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes', '/admin'];
+  const protectedPaths = ['/dashboard', '/learning', '/words', '/sentences', '/conversations', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes', '/for-you', '/scramble', '/admin'];
   const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path));
   
   // Allow login and register pages without auth
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/register');
+
+  if (isAuthPage && user && userExists) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
 
   if (isProtectedPath && (!user || !userExists) && !isAuthPage) {
     // If env vars not configured, don't redirect to login (it won't work either)
