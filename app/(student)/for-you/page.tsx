@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Clock3, ImageIcon, Loader2, NotebookPen, RefreshCw, Send, Upload } from 'lucide-react';
+import { CheckCircle2, Clock3, ImageIcon, LayoutGrid, List, Loader2, NotebookPen, RefreshCw, Send, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Assignment = {
@@ -31,6 +31,7 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export default function ForYouPage() {
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [items, setItems] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -125,20 +126,35 @@ export default function ForYouPage() {
     setUploadingId(null);
   };
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const savedView = window.localStorage.getItem('homework-view');
+    if (savedView === 'grid' || savedView === 'list') setViewMode(savedView);
+    void load();
+  }, [load]);
+
+  const changeView = (mode: 'grid' | 'list') => {
+    setViewMode(mode);
+    window.localStorage.setItem('homework-view', mode);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Your assignments</p><h1 className="mt-1 text-3xl font-bold">Homework</h1><p className="mt-2 text-slate-500">Complete the homework assigned by your teacher before it expires.</p></div>
-        <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"><RefreshCw size={17} /> Refresh</button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-xl border border-stone-200 bg-white p-1" aria-label="Homework view">
+            <button type="button" onClick={() => changeView('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg ${viewMode === 'grid' ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-500 hover:bg-stone-50'}`}><LayoutGrid size={18} /></button>
+            <button type="button" onClick={() => changeView('list')} aria-label="List view" aria-pressed={viewMode === 'list'} className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg ${viewMode === 'list' ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-500 hover:bg-stone-50'}`}><List size={19} /></button>
+          </div>
+          <button type="button" onClick={() => void load()} className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-stone-50"><RefreshCw size={17} /><span className="hidden sm:inline">Refresh</span></button>
+        </div>
       </div>
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {loading ? <p className="text-slate-500">Loading your practice...</p> : items.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{items.map((item) => (
+        <div className={viewMode === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'grid max-w-5xl gap-4'}>{items.map((item) => (
           <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3"><span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-[#b91c1c]"><ImageIcon size={13} />Image homework</span></div>
-            {promptUrls[item.id] && <a href={promptUrls[item.id]} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-xl border border-stone-200"><img src={promptUrls[item.id]} alt="Homework provided by teacher" className="max-h-72 w-full object-contain bg-stone-50" /></a>}
+            {promptUrls[item.id] && <a href={promptUrls[item.id]} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-xl border border-stone-200"><img src={promptUrls[item.id]} alt="Homework provided by teacher" className="max-h-72 w-full bg-stone-50 object-contain" /></a>}
             <h2 className="mt-4 text-xl font-bold text-slate-900">{item.title}</h2>
             {item.description && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{item.description}</p>}
             <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 size={14} /> Available until {new Date(item.expires_at).toLocaleString()}</p>

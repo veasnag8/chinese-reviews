@@ -1,4 +1,12 @@
 -- Add scheduling and display fields for image-based homework.
+-- Homework is global, so remove the legacy required student reference when
+-- this migration is run directly against an older database.
+DROP POLICY IF EXISTS "Students can view active personal assignments"
+  ON public.for_you_assignments;
+DROP INDEX IF EXISTS public.for_you_assignments_student_expiry_idx;
+ALTER TABLE public.for_you_assignments
+  DROP COLUMN IF EXISTS student_id CASCADE;
+
 ALTER TABLE public.for_you_assignments
   ADD COLUMN IF NOT EXISTS title TEXT,
   ADD COLUMN IF NOT EXISTS description TEXT,
@@ -30,7 +38,7 @@ CREATE POLICY "Authenticated users can view active assignments"
   ON public.for_you_assignments
   FOR SELECT
   USING (
-    public.is_admin()
+    public.is_staff()
     OR (
       auth.uid() IS NOT NULL
       AND starts_at <= NOW()
