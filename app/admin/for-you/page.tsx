@@ -1,7 +1,7 @@
 'use client';
 
 import { ClipboardEvent, FormEvent, useCallback, useEffect, useState } from 'react';
-import { Clock3, ImageIcon, NotebookPen, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react';
+import { CheckCircle2, Clock3, ImageIcon, Loader2, NotebookPen, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Assignment = {
@@ -12,6 +12,22 @@ type Assignment = {
   expires_at: string;
   image_path: string | null;
   created_at: string;
+};
+
+type Submission = {
+  id: string;
+  assignment_id: string;
+  user_id: string;
+  answer_image_path: string;
+  status: 'pending_checking' | 'checked';
+  submitted_at: string;
+  checked_at: string | null;
+};
+
+type StudentProfile = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
 };
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -32,6 +48,10 @@ const emptyForm = () => ({
 export default function AdminForYouPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [submissionUrls, setSubmissionUrls] = useState<Record<string, string>>({});
+  const [studentProfiles, setStudentProfiles] = useState<Record<string, StudentProfile>>({});
+  const [checkingId, setCheckingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
   const [formOpen, setFormOpen] = useState(false);
@@ -56,6 +76,28 @@ export default function AdminForYouPage() {
         return [item.id, signed?.signedUrl || ''] as const;
       }));
       setImageUrls(Object.fromEntries(urls));
+
+      const { data: submissionData, error: submissionError } = await (supabase.from('homework_submissions') as any)
+        .select('id, assignment_id, user_id, answer_image_path, status, submitted_at, checked_at')
+        .order('submitted_at', { ascending: false });
+      if (submissionError) {
+        setMessage(submissionError.message);
+      } else {
+        const submissionRows = (submissionData || []) as Submission[];
+        setSubmissions(submissionRows);
+        const userIds = [...new Set(submissionRows.map((submission) => submission.user_id))];
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds);
+          setStudentProfiles(Object.fromEntries(((profiles || []) as StudentProfile[]).map((profile) => [profile.id, profile])));
+        } else {
+          setStudentProfiles({});
+        }
+        const submissionImages = await Promise.all(submissionRows.map(async (submission) => {
+          const { data: signed } = await supabase.storage.from('homework-files').createSignedUrl(submission.answer_image_path, 3600);
+          return [submission.id, signed?.signedUrl || ''] as const;
+        }));
+        setSubmissionUrls(Object.fromEntries(submissionImages));
+      }
     }
     setLoading(false);
   }, []);
@@ -174,6 +216,28 @@ export default function AdminForYouPage() {
     if (assignment.image_path) await supabase.storage.from('homework-files').remove([assignment.image_path]);
     setAssignments((current) => current.filter((item) => item.id !== assignment.id));
     setMessage('Homework deleted.');
+  };
+
+  const markSubmissionChecked = async (submission: Submission) => {
+    if (!supabase || submission.status === 'checked') return;
+    setCheckingId(submission.id);
+    setMessage('');
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      setMessage('Please sign in again.');
+      setCheckingId(null);
+      return;
+    }
+    const checkedAt = new Date().toISOString();
+    const { error } = await (supabase.from('homework_submissions') as any)
+      .update({ status: 'checked', checked_at: checkedAt, checked_by: auth.user.id })
+      .eq('id', submission.id);
+    if (error) setMessage(error.message);
+    else {
+      setSubmissions((current) => current.map((item) => item.id === submission.id ? { ...item, status: 'checked', checked_at: checkedAt } : item));
+      setMessage('Student submission marked as checked.');
+    }
+    setCheckingId(null);
   };
 
   const selectPromptImage = (file?: File) => {
@@ -323,6 +387,53 @@ export default function AdminForYouPage() {
             </article>;
           })}
         </div>}
+      </section>
+
+      <section aria-labelledby="submission-list-title" className="pt-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 id="submission-list-title" className="text-xl font-bold">Student submissions</h2>
+            <p className="mt-1 text-sm text-slate-500">Open uploaded answers and mark them as checked.</p>
+          </div>
+          {!loading && <span className="rounded-full bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700">{submissions.filter((submission) => submission.status === 'pending_checking').length} pending</span>}
+        </div>
+        {loading ? (
+          <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center text-slate-500">Loading submissions…</div>
+        ) : submissions.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center">
+            <ImageIcon className="mx-auto text-stone-300" size={36} />
+            <h3 className="mt-3 font-semibold">No student submissions yet</h3>
+            <p className="mt-1 text-sm text-slate-500">Uploaded homework answers will appear here.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {submissions.map((submission) => {
+              const student = studentProfiles[submission.user_id];
+              const assignment = assignments.find((item) => item.id === submission.assignment_id);
+              const isChecked = submission.status === 'checked';
+              return (
+                <article key={submission.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+                  <a href={submissionUrls[submission.id] || undefined} target="_blank" rel="noreferrer" className="flex aspect-[4/3] items-center justify-center bg-stone-100">
+                    {submissionUrls[submission.id] ? <img src={submissionUrls[submission.id]} alt={`Answer from ${student?.full_name || 'student'}`} className="h-full w-full object-contain" /> : <ImageIcon className="text-stone-300" size={40} />}
+                  </a>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0"><h3 className="truncate font-bold text-slate-900">{student?.full_name || student?.email || 'Student'}</h3>{student?.full_name && student.email && <p className="truncate text-xs text-slate-500">{student.email}</p>}</div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isChecked ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{isChecked ? 'Checked' : 'Pending'}</span>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-slate-700">{assignment?.title || 'Deleted homework'}</p>
+                    <p className="mt-1 text-xs text-slate-500">Submitted {formatDate(submission.submitted_at)}</p>
+                    {isChecked ? (
+                      <div className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-semibold text-emerald-700"><CheckCircle2 size={17} /> Checked{submission.checked_at ? ` · ${formatDate(submission.checked_at)}` : ''}</div>
+                    ) : (
+                      <button type="button" disabled={checkingId !== null} onClick={() => void markSubmissionChecked(submission)} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 text-sm font-semibold text-white disabled:opacity-50">{checkingId === submission.id ? <Loader2 className="animate-spin" size={17} /> : <CheckCircle2 size={17} />}{checkingId === submission.id ? 'Saving…' : 'Mark as checked'}</button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
 
     </div>
