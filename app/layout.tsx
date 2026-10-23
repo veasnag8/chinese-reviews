@@ -1,5 +1,13 @@
 import "./globals.css";
 import { QuizNotificationToaster } from "@/components/quiz-notification-toaster";
+import type { Viewport } from "next";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#b91c1c",
+  interactiveWidget: "resizes-content",
+};
 
 export const metadata = {
   title: "Chinese Review",
@@ -10,7 +18,6 @@ export const metadata = {
     apple: "/icon-192.png",
   },
   manifest: "/manifest.json",
-  themeColor: "#b91c1c",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -27,7 +34,6 @@ export default function Root({
     <html lang="en">
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#b91c1c" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Chinese Review" />

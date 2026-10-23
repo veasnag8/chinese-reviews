@@ -583,7 +583,7 @@ const onWordUpdate = async (data: WordFormData) => {
   }
 
   return (
-    <div className="min-h-screen bg-background px-0 py-2 sm:p-4">
+    <div className="min-h-screen bg-background px-0 py-2 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:p-4 sm:pb-4">
       <div className="pointer-events-none fixed right-4 top-20 z-50">
         <div className="flex flex-col gap-2">
           {importError && (
@@ -603,7 +603,7 @@ const onWordUpdate = async (data: WordFormData) => {
             Manage Words
           </h2>
 
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+          <div className="word-toolbar-grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <label className="flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-center text-sm font-medium text-sky-700 hover:bg-sky-100 sm:px-4"
               onClick={() => { if (fileInputRef.current) fileInputRef.current.value = ''; }}
             >
@@ -658,7 +658,7 @@ const onWordUpdate = async (data: WordFormData) => {
               variant="primary"
               type="button"
               onClick={startAdd}
-              className="col-span-2 min-h-10 w-full sm:w-auto"
+              className="min-h-11 w-full px-4 sm:w-auto"
             >
               + Add Word
             </Button>
@@ -666,8 +666,8 @@ const onWordUpdate = async (data: WordFormData) => {
         </div>
 
         {isEditing && (
-          <Card className="max-w-2xl p-4 sm:p-6">
-            <h3 className="text-lg font-medium mb-4">
+          <Card className="w-full max-w-2xl overflow-hidden rounded-2xl p-4 sm:p-6">
+            <h3 className="mb-5 text-xl font-semibold">
               {editingWord ? "Edit Word" : "Add New Word"}
             </h3>
 
@@ -677,7 +677,7 @@ const onWordUpdate = async (data: WordFormData) => {
                   ? onWordUpdate
                   : onWordSubmit
               )}
-              className="space-y-4"
+              className="space-y-5"
             >
               <div>
                 <div className="mb-2 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -708,11 +708,12 @@ const onWordUpdate = async (data: WordFormData) => {
 
                 <Input
                   placeholder="Enter Chinese character(s)"
+                  className="min-h-11 text-base sm:text-sm"
                   {...register("chinese")}
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+              <div className="word-form-grid gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Pinyin
@@ -720,6 +721,7 @@ const onWordUpdate = async (data: WordFormData) => {
 
                   <Input
                     placeholder="Enter pinyin"
+                    className="min-h-11 text-base sm:text-sm"
                     {...register("pinyin")}
                   />
                 </div>
@@ -731,12 +733,13 @@ const onWordUpdate = async (data: WordFormData) => {
 
                   <Input
                     placeholder="Enter Khmer translation"
+                    className="min-h-11 text-base sm:text-sm"
                     {...register("khmer")}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+              <div className="word-form-grid gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     English
@@ -744,6 +747,7 @@ const onWordUpdate = async (data: WordFormData) => {
 
                   <Input
                     placeholder="Enter English translation"
+                    className="min-h-11 text-base sm:text-sm"
                     {...register("english")}
                   />
                 </div>
@@ -752,6 +756,7 @@ const onWordUpdate = async (data: WordFormData) => {
                     Class
                   </label>
                   <Select
+                    className="min-h-11 text-base sm:text-sm"
                     value={watch("className") || ""}
                     options={[
                       { value: "", label: "Select a class" },
@@ -765,17 +770,18 @@ const onWordUpdate = async (data: WordFormData) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
+              <div className="word-form-grid gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Lesson Date
                   </label>
                   <Input
                     type="date"
+                    className="min-h-11 text-base sm:text-sm"
                     {...register("date")}
                   />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Words with this class name and date will be grouped together.
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                    Used with Class to group this word.
                   </p>
                 </div>
                 <div>
@@ -785,6 +791,7 @@ const onWordUpdate = async (data: WordFormData) => {
 
                   <Input
                     placeholder="Enter category"
+                    className="min-h-11 text-base sm:text-sm"
                     {...register("category")}
                   />
                 </div>
@@ -797,15 +804,16 @@ const onWordUpdate = async (data: WordFormData) => {
 
                 <Input
                   placeholder="e.g., noun, verb"
+                  className="min-h-11 text-base sm:text-sm"
                   {...register("partOfSpeech")}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:flex">
+              <div className="word-action-grid gap-2 pt-1 sm:flex">
                 <Button
                   type="submit"
                   disabled={formState === "submitting"}
-                  className="min-h-10 w-full sm:w-auto"
+                  className="min-h-11 w-full px-5 sm:w-auto"
                 >
                   {formState === "submitting"
                     ? "Saving..."
@@ -817,7 +825,7 @@ const onWordUpdate = async (data: WordFormData) => {
                 <Button
                   type="button"
                   variant="outline"
-                  className="min-h-10 w-full sm:w-auto"
+                  className="min-h-11 w-full px-5 sm:w-auto"
                   onClick={() => {
                     setIsEditing(false);
                     setEditingWord(null);
@@ -855,7 +863,7 @@ const onWordUpdate = async (data: WordFormData) => {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search Chinese, Pinyin, Khmer, or English"
-              className="sm:max-w-sm"
+              className="min-h-11 text-base sm:max-w-sm sm:text-sm"
             />
           </div>
 

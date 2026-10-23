@@ -96,3 +96,18 @@ input::placeholder {
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: #991b1b;
 }
+
+.word-toolbar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+
+.word-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+
+.word-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+}
