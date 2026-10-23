@@ -17,6 +17,15 @@ type Conversation = {
 
 type TranslationLanguage = 'khmer' | 'english';
 
+const speakerThemes = [
+  { avatar: 'bg-red-600', name: 'text-red-700', bubble: 'border-red-100 bg-white text-slate-950', pinyin: 'text-orange-500', active: 'bg-red-600 text-white', translation: 'bg-red-50 text-red-950' },
+  { avatar: 'bg-blue-600', name: 'text-blue-700', bubble: 'border-blue-600 bg-blue-600 text-white', pinyin: 'text-blue-100', active: 'bg-blue-600 text-white', translation: 'bg-blue-50 text-blue-950' },
+  { avatar: 'bg-emerald-600', name: 'text-emerald-700', bubble: 'border-emerald-600 bg-emerald-600 text-white', pinyin: 'text-emerald-100', active: 'bg-emerald-600 text-white', translation: 'bg-emerald-50 text-emerald-950' },
+  { avatar: 'bg-violet-600', name: 'text-violet-700', bubble: 'border-violet-600 bg-violet-600 text-white', pinyin: 'text-violet-100', active: 'bg-violet-600 text-white', translation: 'bg-violet-50 text-violet-950' },
+  { avatar: 'bg-amber-500', name: 'text-amber-700', bubble: 'border-amber-200 bg-amber-100 text-amber-950', pinyin: 'text-amber-700', active: 'bg-amber-500 text-amber-950', translation: 'bg-amber-50 text-amber-950' },
+  { avatar: 'bg-pink-600', name: 'text-pink-700', bubble: 'border-pink-600 bg-pink-600 text-white', pinyin: 'text-pink-100', active: 'bg-pink-600 text-white', translation: 'bg-pink-50 text-pink-950' },
+];
+
 const lines = (value?: string | null) => (value || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 
 const splitSpeaker = (value: string) => {
@@ -35,6 +44,7 @@ export default function ConversationsPage() {
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [visibleTranslations, setVisibleTranslations] = useState<Record<string, TranslationLanguage | undefined>>({});
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!supabase) return;
@@ -53,6 +63,17 @@ export default function ConversationsPage() {
 
   const toggleTranslation = (key: string, language: TranslationLanguage) => {
     setVisibleTranslations((current) => ({ ...current, [key]: current[key] === language ? undefined : language }));
+  };
+
+  const toggleRow = (key: string) => {
+    setExpandedRows((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+        setVisibleTranslations((translations) => ({ ...translations, [key]: undefined }));
+      } else next.add(key);
+      return next;
+    });
   };
 
   const dateGroups = conversations.reduce<Record<string, Conversation[]>>((groups, conversation) => {
@@ -112,24 +133,25 @@ export default function ConversationsPage() {
                     const { speaker, text } = splitSpeaker(line);
                     const speakerIndex = speaker ? Math.max(0, speakerNames.indexOf(speaker)) : index % 2;
                     const isRight = speakerIndex % 2 === 1;
+                    const theme = speakerThemes[speakerIndex % speakerThemes.length];
                     const pinyin = splitSpeaker(pinyinLines[index] || '').text;
                     const rowKey = `${conversation.id}-${index}`;
                     const language = visibleTranslations[rowKey];
                     const translation = language === 'khmer' ? translationAt(conversation.khmer_translation, index) : language === 'english' ? translationAt(conversation.english_translation, index) : '';
                     return (
                       <div key={rowKey} className={`flex items-end gap-2.5 ${isRight ? 'flex-row-reverse' : ''}`}>
-                        <div className={`flex size-11 shrink-0 items-center justify-center rounded-full px-2 text-center text-xs font-bold shadow-sm ${isRight ? 'bg-blue-600 text-white' : 'bg-[#b91c1c] text-white'}`}>{speaker || index + 1}</div>
+                        <div className={`flex size-11 shrink-0 items-center justify-center rounded-full px-2 text-center text-xs font-bold text-white shadow-sm ${theme.avatar}`}>{speaker || index + 1}</div>
                         <div className={`min-w-0 max-w-[85%] sm:max-w-[72%] ${isRight ? 'items-end' : 'items-start'}`}>
-                          <p className={`mb-1 px-1 text-xs font-bold ${isRight ? 'text-right text-blue-700' : 'text-[#b91c1c]'}`}>{speaker || `Speaker ${speakerIndex + 1}`}</p>
-                          <div className={`relative rounded-2xl px-4 py-3 shadow-sm ${isRight ? 'rounded-br-md bg-blue-600 text-white' : 'rounded-bl-md border border-red-100 bg-white text-slate-950'}`}>
-                            {pinyin && <p className={`text-sm leading-relaxed ${isRight ? 'text-blue-100' : 'text-orange-500'}`}>{pinyin}</p>}
-                            <div className="mt-0.5 flex items-start justify-between gap-3"><p className="text-lg font-semibold leading-relaxed sm:text-xl">{text}</p><button type="button" onClick={() => speakChinese(text)} aria-label={`Read ${text}`} className={`shrink-0 rounded-full p-2 ${isRight ? 'text-blue-100 hover:bg-blue-500 hover:text-white' : 'text-slate-500 hover:bg-red-50 hover:text-[#b91c1c]'}`}><Volume2 size={18} /></button></div>
+                          <p className={`mb-1 px-1 text-xs font-bold ${isRight ? 'text-right' : ''} ${theme.name}`}>{speaker || `Speaker ${speakerIndex + 1}`}</p>
+                          <div role="button" tabIndex={0} aria-expanded={expandedRows.has(rowKey)} onClick={() => toggleRow(rowKey)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRow(rowKey); } }} className={`relative cursor-pointer rounded-2xl border px-4 py-3 shadow-sm transition hover:shadow-md ${isRight ? 'rounded-br-md' : 'rounded-bl-md'} ${theme.bubble}`}>
+                            {pinyin && <p className={`text-sm leading-relaxed ${theme.pinyin}`}>{pinyin}</p>}
+                            <div className="mt-0.5 flex items-start justify-between gap-3"><p className="text-lg font-semibold leading-relaxed sm:text-xl">{text}</p><button type="button" onClick={(event) => { event.stopPropagation(); speakChinese(text); }} aria-label={`Read ${text}`} className="shrink-0 rounded-full p-2 text-current opacity-70 hover:bg-white/15 hover:opacity-100"><Volume2 size={18} /></button></div>
                           </div>
-                          <div className={`mt-2 flex gap-2 ${isRight ? 'justify-end' : ''}`}>
-                            <button type="button" onClick={() => toggleTranslation(rowKey, 'khmer')} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold ${language === 'khmer' ? isRight ? 'bg-blue-600 text-white' : 'bg-[#b91c1c] text-white' : 'border border-stone-200 bg-white text-slate-600 hover:bg-stone-50'}`}><Languages size={14} /> Khmer</button>
-                            <button type="button" onClick={() => toggleTranslation(rowKey, 'english')} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold ${language === 'english' ? isRight ? 'bg-blue-600 text-white' : 'bg-[#b91c1c] text-white' : 'border border-stone-200 bg-white text-slate-600 hover:bg-stone-50'}`}><Languages size={14} /> English</button>
-                          </div>
-                          {language && <p className={`mt-2 rounded-xl px-3 py-2.5 text-sm leading-relaxed ${isRight ? 'bg-blue-50 text-blue-900' : 'bg-amber-50 text-slate-700'}`}>{translation || 'No translation for this line yet.'}</p>}
+                          {expandedRows.has(rowKey) && <div className={`mt-2 flex gap-2 ${isRight ? 'justify-end' : ''}`}>
+                            <button type="button" onClick={() => toggleTranslation(rowKey, 'khmer')} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold ${language === 'khmer' ? theme.active : 'border border-stone-200 bg-white text-slate-600 hover:bg-stone-50'}`}><Languages size={14} /> Khmer</button>
+                            <button type="button" onClick={() => toggleTranslation(rowKey, 'english')} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold ${language === 'english' ? theme.active : 'border border-stone-200 bg-white text-slate-600 hover:bg-stone-50'}`}><Languages size={14} /> English</button>
+                          </div>}
+                          {expandedRows.has(rowKey) && language && <p className={`mt-2 rounded-xl px-3 py-2.5 text-sm leading-relaxed ${theme.translation}`}>{translation || 'No translation for this line yet.'}</p>}
                         </div>
                       </div>
                     );
