@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, BookOpenText, CalendarDays, Languages, Loader2, MessageCircle, Volume2 } from 'lucide-react';
+import { pinyin } from 'pinyin-pro';
 import { supabase } from '@/lib/supabase';
 import { speakChinese } from '@/lib/speech';
 
@@ -37,6 +38,8 @@ const translationAt = (value: string | null, index: number) => {
   const row = lines(value)[index] || '';
   return splitSpeaker(row).text;
 };
+
+const speakerPinyin = (name: string) => pinyin(name, { toneType: 'symbol' });
 
 export default function ConversationsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -131,7 +134,7 @@ export default function ConversationsPage() {
                   <span className="inline-flex items-center gap-2 font-semibold text-slate-800"><BookOpenText size={18} className="text-[#b91c1c]" />{conversation.classes?.name || 'Conversation'}</span>
                   <div className="flex flex-wrap items-center gap-1.5 sm:justify-center">
                     <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">{speakerNames.length} {speakerNames.length === 1 ? 'person' : 'people'}</span>
-                    {speakerNames.map((name, speakerIndex) => <span key={name} className={`rounded-full px-2.5 py-1 text-xs font-semibold text-white ${speakerThemes[speakerIndex % speakerThemes.length].avatar}`}>{name}</span>)}
+                    {speakerNames.map((name, speakerIndex) => <span key={name} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-white ${speakerThemes[speakerIndex % speakerThemes.length].avatar}`}><span>{name}</span><span className="font-normal opacity-80">{speakerPinyin(name)}</span></span>)}
                   </div>
                   {conversation.classes?.date && <span className="text-xs text-slate-500 sm:text-right">{conversation.classes.date}</span>}
                 </div>
