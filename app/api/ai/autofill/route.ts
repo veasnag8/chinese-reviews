@@ -29,6 +29,8 @@ Provide accurate and natural translations in JSON format with exactly these fiel
 - "khmerTranslation": natural, standard Cambodian Khmer translation
 - "englishTranslation": accurate English translation
 
+If the input contains multiple dialogue lines in the format "Name: sentence", preserve the exact number and order of lines in all three output fields. Put each translated line on a new line and keep the same speaker prefix, for example "马丁: Lǎoshī, nín hǎo". Never merge dialogue lines.
+
 Output ONLY valid raw JSON with no markdown wrapping.`;
 
       const response = await ai.models.generateContent({

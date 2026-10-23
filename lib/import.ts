@@ -95,8 +95,7 @@ export function mapSentenceRow(row: string[], headers: string[]): SentenceImport
     : 'single';
   const speakerOneName = obj['speaker_one_name'] || obj['speaker_1'] || obj['speaker_a'] || '';
   const speakerTwoName = obj['speaker_two_name'] || obj['speaker_2'] || obj['speaker_b'] || '';
-  if (sentenceType === 'conversation' && (!speakerOneName || !speakerTwoName)) return null;
-  
+
   return {
     chinese_sentence: chinese,
     pinyin: obj['pinyin'] || undefined,

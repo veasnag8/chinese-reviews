@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, NotebookPen, PenLine, Settings, TextQuote, Users, X, Brain } from 'lucide-react';
+import { BookOpen, CalendarDays, ChartNoAxesColumnIncreasing, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, MessageCircle, NotebookPen, PenLine, Settings, TextQuote, Users, X, Brain } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -16,6 +16,7 @@ const navigation = [
   { href: '/admin/for-you', label: 'Create Homework', icon: NotebookPen, admin: true },
   { href: '/admin/words', label: 'Words List', icon: List, admin: true },
   { href: '/sentences', label: 'Sentence', icon: TextQuote, admin: false },
+  { href: '/conversations', label: 'Conversation', icon: MessageCircle, admin: false },
   { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
   { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
   { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList, admin: true },
@@ -39,6 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [homeworkCount, setHomeworkCount] = useState(0);
   const [wordCount, setWordCount] = useState(0);
   const [sentenceCount, setSentenceCount] = useState(0);
+  const [conversationCount, setConversationCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -53,6 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const overflowItems = [
     { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
     { href: '/for-you', label: 'Homework', icon: NotebookPen, admin: false },
+    { href: '/conversations', label: 'Conversation', icon: MessageCircle, admin: false },
     { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
     { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
     { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
@@ -72,6 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (href === '/for-you') return homeworkCount;
     if (href === '/words') return wordCount;
     if (href === '/sentences') return sentenceCount;
+    if (href === '/conversations') return conversationCount;
     return 0;
   };
 
@@ -94,6 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           setHomeworkCount(0);
           setWordCount(0);
           setSentenceCount(0);
+          setConversationCount(0);
           setCurrentUserId('');
           return;
         }
@@ -101,21 +106,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         const nowIso = new Date().toISOString();
         const wordsSeenKey = `words_seen_at_${auth.user.id}`;
         const sentencesSeenKey = `sentences_seen_at_${auth.user.id}`;
+        const conversationsSeenKey = `conversations_seen_at_${auth.user.id}`;
         const wordsSeenAt = window.localStorage.getItem(wordsSeenKey) || nowIso;
         const sentencesSeenAt = window.localStorage.getItem(sentencesSeenKey) || nowIso;
+        const conversationsSeenAt = window.localStorage.getItem(conversationsSeenKey) || nowIso;
         if (!window.localStorage.getItem(wordsSeenKey)) window.localStorage.setItem(wordsSeenKey, nowIso);
         if (!window.localStorage.getItem(sentencesSeenKey)) window.localStorage.setItem(sentencesSeenKey, nowIso);
-        const [quizzes, submissions, homework, homeworkSubmissions, newWords, newSentences] = await Promise.all([
+        if (!window.localStorage.getItem(conversationsSeenKey)) window.localStorage.setItem(conversationsSeenKey, nowIso);
+        const [quizzes, submissions, homework, homeworkSubmissions, newWords, newSentences, newConversations] = await Promise.all([
           client.from('quizzes').select('id, start_at, deadline').eq('status', 'active'),
           client.from('quiz_submissions').select('quiz_id').eq('user_id', auth.user.id).eq('status', 'submitted'),
           client.from('for_you_assignments').select('id').lte('starts_at', nowIso).gt('expires_at', nowIso),
           client.from('homework_submissions').select('assignment_id, status').eq('user_id', auth.user.id),
           client.from('words').select('id', { count: 'exact', head: true }).gt('created_at', wordsSeenAt),
-          client.from('sentences').select('id', { count: 'exact', head: true }).gt('created_at', sentencesSeenAt),
+          client.from('sentences').select('id', { count: 'exact', head: true }).eq('sentence_type', 'single').gt('created_at', sentencesSeenAt),
+          client.from('sentences').select('id', { count: 'exact', head: true }).eq('sentence_type', 'conversation').gt('created_at', conversationsSeenAt),
         ]);
         if (!active || version !== request) return;
         if (!newWords.error) setWordCount(newWords.count || 0);
         if (!newSentences.error) setSentenceCount(newSentences.count || 0);
+        if (!newConversations.error) setConversationCount(newConversations.count || 0);
         if (!homework.error && !homeworkSubmissions.error) {
           const completedHomework = new Set((homeworkSubmissions.data || []).filter((row: { status: string }) => row.status !== 'needs_revision').map((row: { assignment_id: string }) => row.assignment_id));
           setHomeworkCount((homework.data || []).filter((item: { id: string }) => !completedHomework.has(item.id)).length);
@@ -213,6 +223,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       setHomeworkCount(0);
       setWordCount(0);
       setSentenceCount(0);
+      setConversationCount(0);
       window.setTimeout(() => { if (active) void refresh(); }, 0);
     });
     return () => {
@@ -238,6 +249,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (pathname === '/sentences') {
       window.localStorage.setItem(`sentences_seen_at_${currentUserId}`, now);
       setSentenceCount(0);
+    }
+    if (pathname === '/conversations') {
+      window.localStorage.setItem(`conversations_seen_at_${currentUserId}`, now);
+      setConversationCount(0);
     }
   }, [currentUserId, pathname]);
 
