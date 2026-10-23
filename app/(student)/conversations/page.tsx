@@ -127,7 +127,14 @@ export default function ConversationsPage() {
             const speakerNames = [...new Set(chineseLines.map((line) => splitSpeaker(line).speaker).filter(Boolean))];
             return (
               <article key={conversation.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between gap-3 border-b border-stone-100 bg-stone-50 px-4 py-3 sm:px-6"><span className="inline-flex items-center gap-2 font-semibold text-slate-800"><BookOpenText size={18} className="text-[#b91c1c]" />{conversation.classes?.name || 'Conversation'}</span>{conversation.classes?.date && <span className="text-xs text-slate-500">{conversation.classes.date}</span>}</div>
+                <div className="grid gap-2 border-b border-stone-100 bg-stone-50 px-4 py-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:px-6">
+                  <span className="inline-flex items-center gap-2 font-semibold text-slate-800"><BookOpenText size={18} className="text-[#b91c1c]" />{conversation.classes?.name || 'Conversation'}</span>
+                  <div className="flex flex-wrap items-center gap-1.5 sm:justify-center">
+                    <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">{speakerNames.length} {speakerNames.length === 1 ? 'person' : 'people'}</span>
+                    {speakerNames.map((name, speakerIndex) => <span key={name} className={`rounded-full px-2.5 py-1 text-xs font-semibold text-white ${speakerThemes[speakerIndex % speakerThemes.length].avatar}`}>{name}</span>)}
+                  </div>
+                  {conversation.classes?.date && <span className="text-xs text-slate-500 sm:text-right">{conversation.classes.date}</span>}
+                </div>
                 <div className="space-y-1 bg-[#fffefa] p-4 sm:p-7">
                   {chineseLines.map((line, index) => {
                     const { speaker, text } = splitSpeaker(line);
