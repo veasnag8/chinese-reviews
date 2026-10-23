@@ -247,6 +247,22 @@ export default function SentencesPage() {
     defaultValues: { sentenceType: 'single', speakerOneName: '', speakerTwoName: '' },
   });
 
+  const startAdding = (type: 'single' | 'conversation' = activeType) => {
+    setFormState('idle');
+    reset({
+      sentenceType: type,
+      speakerOneName: '',
+      speakerTwoName: '',
+      chineseSentence: '',
+      pinyin: '',
+      khmerTranslation: '',
+      englishTranslation: '',
+      audioUrl: '',
+      classId: '',
+    });
+    setIsAdding(true);
+  };
+
   const onAddSentence = async (data: SentenceFormData) => {
     if (!user) return;
 
@@ -418,6 +434,10 @@ export default function SentencesPage() {
   const filteredSentences = sentences.filter(
     (sentence) => (sentence.sentence_type || 'single') === activeType
   );
+  const pagedSentences = filteredSentences.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -429,8 +449,8 @@ export default function SentencesPage() {
 
           <div className="flex flex-wrap gap-2">
             {isStaff && (
-              <Button variant="primary" type="button" onClick={() => setIsAdding(true)}>
-                + Add Sentence
+              <Button variant="primary" type="button" onClick={() => startAdding(activeType)}>
+                + Add {activeType === 'conversation' ? 'Conversation' : 'Sentence'}
               </Button>
             )}
             <label className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 cursor-pointer hover:bg-sky-100">
@@ -465,7 +485,7 @@ export default function SentencesPage() {
 
         {isStaff && isAdding && (
           <form onSubmit={handleSubmit(onAddSentence)} className="mb-6 space-y-4 rounded-xl border border-border bg-card p-4">
-            <h3 className="text-lg font-semibold">Add sentence</h3>
+            <h3 className="text-lg font-semibold">Add {watch("sentenceType") === 'conversation' ? 'conversation' : 'sentence'}</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-medium">
                 Type
@@ -546,7 +566,7 @@ export default function SentencesPage() {
               <input {...register("audioUrl")} placeholder="Audio URL (optional)" className="rounded-md border border-input bg-background px-3 py-2" />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" disabled={formState === "submitting" || !watch("classId")}>{formState === "submitting" ? "Saving..." : "Save Sentence"}</Button>
+              <Button type="submit" disabled={formState === "submitting" || !watch("classId")}>{formState === "submitting" ? "Saving..." : `Save ${watch("sentenceType") === 'conversation' ? 'Conversation' : 'Sentence'}`}</Button>
               <Button type="button" variant="outline" onClick={() => { setIsAdding(false); reset(); }}>Cancel</Button>
             </div>
           </form>
@@ -747,12 +767,87 @@ export default function SentencesPage() {
           <EmptyState>
             <p>No {activeType === 'single' ? 'single sentences' : 'conversations'} yet</p>
             <p className="text-sm mt-2">
-              Add your first sentence to get started
+              Add your first {activeType === 'single' ? 'sentence' : 'conversation'} to get started
             </p>
+            {isStaff && (
+              <Button type="button" variant="primary" onClick={() => startAdding(activeType)} className="mt-4 bg-[#b91c1c] text-white hover:bg-[#991b1b]">
+                + Add {activeType === 'conversation' ? 'Conversation' : 'Sentence'}
+              </Button>
+            )}
           </EmptyState>
         ) : (
           <>
-            <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <div className="space-y-3 md:hidden">
+              {pagedSentences.map((sentence: any) => (
+                <article key={sentence.id} className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+                  {sentence.sentence_type === 'conversation' && (
+                    <p className="mb-2 text-xs font-semibold text-[#b91c1c]">
+                      {sentence.speaker_one_name} ↔ {sentence.speaker_two_name}
+                    </p>
+                  )}
+
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => speak(sentence.chinese_sentence, sentence.audio_url)}
+                      className="grid size-11 shrink-0 place-items-center rounded-full bg-red-50 text-[#b91c1c] transition active:scale-95"
+                      aria-label="Listen to sentence"
+                    >
+                      <Volume2 size={20} />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start gap-2">
+                        <h3 className="whitespace-pre-line break-words text-xl font-bold leading-relaxed text-slate-900">
+                          {sentence.chinese_sentence}
+                        </h3>
+                        {isWithinLast24Hours(sentence.created_at) && (
+                          <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#b91c1c]">NEW</span>
+                        )}
+                      </div>
+                      <p className="mt-1 whitespace-pre-line break-words text-sm font-medium leading-relaxed text-[#b91c1c]">
+                        {sentence.pinyin || "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <dl className="mt-4 space-y-3 border-t border-stone-100 pt-4">
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Khmer</dt>
+                      <dd className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">{sentence.khmer_translation || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">English</dt>
+                      <dd className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-slate-700">{sentence.english_translation || "—"}</dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-4">
+                    <span className="mr-auto max-w-36 truncate rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                      {sentence.classes?.name || sentence.classes?.date || sentence.class_name || "No class"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={!favoritesReady || pendingFavorites.has(sentence.id)}
+                      onClick={() => void toggleSentenceFavorite(sentence.id)}
+                      aria-pressed={favoriteSentences.has(sentence.id)}
+                      aria-label={`${favoriteSentences.has(sentence.id) ? 'Remove' : 'Save'} sentence ${favoriteSentences.has(sentence.id) ? 'from' : 'to'} favorites`}
+                      className={`grid size-11 place-items-center rounded-xl border transition disabled:opacity-50 ${favoriteSentences.has(sentence.id) ? 'border-red-200 bg-red-50 text-red-500' : 'border-stone-200 text-slate-500'}`}
+                    >
+                      <Heart size={19} fill={favoriteSentences.has(sentence.id) ? 'currentColor' : 'none'} />
+                    </button>
+                  </div>
+
+                  {(isStaff || isAdmin || sentence.user_id === user) && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button variant="outline" type="button" onClick={() => startEditing(sentence)} className="min-h-11 w-full"><Edit2 size={15} /> Edit</Button>
+                      <Button variant="destructive" type="button" onClick={() => deleteSentence(sentence.id, sentence.chinese_sentence)} className="min-h-11 w-full"><Trash2 size={15} /> Delete</Button>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm md:block">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-stone-200 bg-stone-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -766,9 +861,7 @@ export default function SentencesPage() {
                 </thead>
 
                 <tbody className="divide-y divide-stone-100">
-                  {filteredSentences
-                    .slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-                    .map((sentence: any) => (
+                  {pagedSentences.map((sentence: any) => (
                       <tr
                         key={sentence.id}
                         className="hover:bg-stone-50/70 transition"
