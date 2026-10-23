@@ -1,7 +1,7 @@
 'use client';
 
 import { ClipboardEvent, FormEvent, useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Clock3, ImageIcon, Loader2, NotebookPen, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react';
+import { CheckCircle2, ClipboardPaste, Clock3, ImageIcon, Loader2, NotebookPen, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Assignment = {
@@ -303,6 +303,28 @@ export default function AdminForYouPage() {
     }
   };
 
+  const pasteImageFromClipboard = async () => {
+    if (!navigator.clipboard?.read) {
+      setMessage('Image paste is not supported by this browser. Tap Choose image to select the screenshot from Photos.');
+      return;
+    }
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const clipboardItem of clipboardItems) {
+        const imageType = clipboardItem.types.find((type) => type.startsWith('image/'));
+        if (!imageType) continue;
+        const blob = await clipboardItem.getType(imageType);
+        const extension = imageType.split('/')[1] || 'png';
+        const copiedImage = new File([blob], `pasted-homework.${extension}`, { type: imageType });
+        selectPromptImage(await convertClipboardImageToPng(copiedImage));
+        return;
+      }
+      setMessage('No image was found in the clipboard. Copy a screenshot first, or choose one from Photos.');
+    } catch {
+      setMessage('Clipboard access was blocked. Allow Paste when prompted, or tap Choose image to select from Photos.');
+    }
+  };
+
   const assignmentStatus = (assignment: Assignment) => {
     const now = Date.now();
     if (new Date(assignment.starts_at).getTime() > now) return { label: 'Scheduled', className: 'bg-blue-50 text-blue-700' };
@@ -323,7 +345,7 @@ export default function AdminForYouPage() {
           <h1 className="mt-1 text-3xl font-bold">Homework</h1>
           <p className="mt-2 text-slate-500">View, edit, and manage image homework for every student.</p>
         </div>
-        <button type="button" onClick={openCreateForm} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#991b1b]"><Plus size={18} /> Create homework</button>
+        <button type="button" onClick={openCreateForm} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"><Plus size={18} /> Create homework</button>
       </div>
 
       {message && <p role="status" className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">{message}</p>}
@@ -348,12 +370,14 @@ export default function AdminForYouPage() {
           </label>
           <label className="text-sm font-semibold text-slate-700 md:col-span-2">Image
             {editingAssignment && imageUrls[editingAssignment.id] && !promptImage && <img src={imageUrls[editingAssignment.id]} alt="Current homework" className="mt-2 max-h-48 w-full rounded-xl border border-stone-200 object-contain" />}
-            <span tabIndex={0} className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-5 text-center font-normal text-slate-600 outline-none hover:bg-stone-100 focus:border-[#b91c1c] focus:ring-2 focus:ring-red-100"><span className="flex items-center gap-2"><Upload size={18} />{promptImage ? promptImage.name : editingAssignment?.image_path ? 'Choose or paste a replacement image' : 'Choose, screenshot, or paste an image'}</span><span className="text-xs text-slate-400">Copy from Word or take a screenshot, then press Ctrl+V / Cmd+V anywhere in this form · Max 5 MB</span><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; selectPromptImage(file); }} /></span>
+            <span tabIndex={0} className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-5 text-center font-normal text-slate-600 outline-none hover:bg-stone-100 focus:border-[#b91c1c] focus:ring-2 focus:ring-red-100"><span className="flex items-center gap-2"><Upload size={18} />{promptImage ? promptImage.name : editingAssignment?.image_path ? 'Choose a replacement image' : 'Choose an image or screenshot'}</span><span className="text-xs text-slate-400">JPEG, PNG or WebP · Max 5 MB</span><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; selectPromptImage(file); }} /></span>
+            <button type="button" onClick={() => void pasteImageFromClipboard()} className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2.5 font-semibold text-amber-950 hover:bg-amber-500"><ClipboardPaste size={18} /> Paste image</button>
+            <span className="mt-1 block text-center text-xs font-normal text-slate-400">PC: copy a screenshot, then paste · iPhone/iPad: copy the image and tap Paste image</span>
           </label>
         </div>
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row">
           <button type="button" onClick={closeForm} className="min-h-11 rounded-xl border border-stone-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-stone-50">Cancel</button>
-          <button disabled={saving} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"><Send size={17} /> {saving ? 'Saving...' : editingAssignment ? 'Save changes' : 'Create homework'}</button>
+          <button disabled={saving} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"><Send size={17} /> {saving ? 'Saving...' : editingAssignment ? 'Save changes' : 'Create homework'}</button>
         </div>
       </form>}
 
@@ -365,7 +389,7 @@ export default function AdminForYouPage() {
         {loading ? <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center text-slate-500">Loading homework…</div> : assignments.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-10 text-center">
             <NotebookPen className="mx-auto text-slate-300" size={36} /><h3 className="mt-3 font-semibold">No homework yet</h3><p className="mt-1 text-sm text-slate-500">Create your first image homework for students.</p>
-            <button type="button" onClick={openCreateForm} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17} /> Create homework</button>
+            <button type="button" onClick={openCreateForm} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"><Plus size={17} /> Create homework</button>
           </div>
         ) : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {assignments.map((assignment) => {
@@ -381,7 +405,7 @@ export default function AdminForYouPage() {
                 <div className="mt-3 flex items-start gap-2 text-xs text-slate-500"><Clock3 className="mt-0.5 shrink-0" size={15} /><span>{formatDate(assignment.starts_at)}<br />to {formatDate(assignment.expires_at)}</span></div>
                 <div className="mt-4 flex gap-2 border-t border-stone-100 pt-3">
                   <button type="button" onClick={(event) => { event.stopPropagation(); openEditForm(assignment); }} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 text-sm font-semibold text-slate-700 hover:bg-stone-50"><Pencil size={15} /> Edit</button>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); void deleteAssignment(assignment); }} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50"><Trash2 size={15} /> Delete</button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); void deleteAssignment(assignment); }} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"><Trash2 size={15} /> Delete</button>
                 </div>
               </div>
             </article>;
@@ -426,7 +450,7 @@ export default function AdminForYouPage() {
                     {isChecked ? (
                       <div className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-semibold text-emerald-700"><CheckCircle2 size={17} /> Checked{submission.checked_at ? ` · ${formatDate(submission.checked_at)}` : ''}</div>
                     ) : (
-                      <button type="button" disabled={checkingId !== null} onClick={() => void markSubmissionChecked(submission)} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 text-sm font-semibold text-white disabled:opacity-50">{checkingId === submission.id ? <Loader2 className="animate-spin" size={17} /> : <CheckCircle2 size={17} />}{checkingId === submission.id ? 'Saving…' : 'Mark as checked'}</button>
+                      <button type="button" disabled={checkingId !== null} onClick={() => void markSubmissionChecked(submission)} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-amber-950 hover:bg-amber-500 disabled:opacity-50">{checkingId === submission.id ? <Loader2 className="animate-spin" size={17} /> : <CheckCircle2 size={17} />}{checkingId === submission.id ? 'Saving…' : 'Mark as checked'}</button>
                     )}
                   </div>
                 </article>

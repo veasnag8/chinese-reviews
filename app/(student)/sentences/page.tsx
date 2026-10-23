@@ -449,11 +449,11 @@ export default function SentencesPage() {
 
           <div className="flex flex-wrap gap-2">
             {isStaff && (
-              <Button variant="primary" type="button" onClick={() => startAdding(activeType)}>
+              <Button variant="success" type="button" onClick={() => startAdding(activeType)}>
                 + Add {activeType === 'conversation' ? 'Conversation' : 'Sentence'}
               </Button>
             )}
-            <label className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 cursor-pointer hover:bg-sky-100">
+            <label className="flex items-center gap-2 rounded-xl bg-amber-400 px-4 py-2 text-sm font-semibold text-amber-950 cursor-pointer hover:bg-amber-500">
               <Upload size={17} />
               <span>Import CSV/Excel</span>
               <input
@@ -566,7 +566,7 @@ export default function SentencesPage() {
               <input {...register("audioUrl")} placeholder="Audio URL (optional)" className="rounded-md border border-input bg-background px-3 py-2" />
             </div>
             <div className="flex gap-2">
-              <Button type="submit" disabled={formState === "submitting" || !watch("classId")}>{formState === "submitting" ? "Saving..." : `Save ${watch("sentenceType") === 'conversation' ? 'Conversation' : 'Sentence'}`}</Button>
+              <Button variant="success" type="submit" disabled={formState === "submitting" || !watch("classId")}>{formState === "submitting" ? "Saving..." : `Save ${watch("sentenceType") === 'conversation' ? 'Conversation' : 'Sentence'}`}</Button>
               <Button type="button" variant="outline" onClick={() => { setIsAdding(false); reset(); }}>Cancel</Button>
             </div>
           </form>
@@ -732,7 +732,7 @@ export default function SentencesPage() {
                   </Button>
                   <Button
                     type="submit"
-                    variant="primary"
+                    variant="warning"
                     disabled={isSavingEdit || !editFormData.chineseSentence.trim() || (editFormData.sentenceType === 'conversation' && (!editFormData.speakerOneName.trim() || !editFormData.speakerTwoName.trim()))}
                   >
                     {isSavingEdit ? "Saving Changes..." : "Save Changes"}
@@ -770,7 +770,7 @@ export default function SentencesPage() {
               Add your first {activeType === 'single' ? 'sentence' : 'conversation'} to get started
             </p>
             {isStaff && (
-              <Button type="button" variant="primary" onClick={() => startAdding(activeType)} className="mt-4 bg-[#b91c1c] text-white hover:bg-[#991b1b]">
+              <Button type="button" variant="success" onClick={() => startAdding(activeType)} className="mt-4">
                 + Add {activeType === 'conversation' ? 'Conversation' : 'Sentence'}
               </Button>
             )}

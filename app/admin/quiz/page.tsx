@@ -412,7 +412,7 @@ export default function AdminQuizPage() {
                 type="button"
                 disabled={selectedQuestionIds.length === 0}
                 onClick={deleteSelectedQuestions}
-                className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-40"
               >
                 <Trash2 size={14} /> Delete selected ({selectedQuestionIds.length})
               </button>
@@ -420,7 +420,7 @@ export default function AdminQuizPage() {
             <button
               type="button"
               onClick={openAddForm}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#b91c1c] px-3 py-2 text-sm font-semibold text-white"
+              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
             >
               <Plus size={15} /> Add new
             </button>
@@ -467,7 +467,7 @@ export default function AdminQuizPage() {
                       >
                         <Pencil size={13} /> Edit
                       </button>
-                      <button type="button" onClick={() => deleteQuestion(question.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700">
+                      <button type="button" onClick={() => deleteQuestion(question.id)} className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
                         <Trash2 size={13} /> Delete
                       </button>
                     </div>
@@ -627,7 +627,7 @@ export default function AdminQuizPage() {
                 <button type="button" onClick={closeForm} className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-slate-700">
                   Cancel
                 </button>
-                <button type="submit" disabled={saving} className="rounded-lg bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                <button type="submit" disabled={saving} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                   {saving ? 'Saving...' : editingQuestion ? 'Save changes' : 'Add question'}
                 </button>
               </div>

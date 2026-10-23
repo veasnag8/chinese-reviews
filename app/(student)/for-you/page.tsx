@@ -164,7 +164,7 @@ export default function ForYouPage() {
                 {answerUrls[item.id] && <a href={answerUrls[item.id]} target="_blank" rel="noreferrer"><img src={answerUrls[item.id]} alt="Your homework answer" className="mt-3 max-h-48 w-full rounded-lg object-contain" /></a>}
               </div>
             )}
-            <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+            <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-500 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
               {uploadingId === item.id ? <Loader2 size={16} className="animate-spin" /> : submissions[item.id] ? <Upload size={16} /> : <Send size={16} />}
               {uploadingId === item.id ? 'Uploading...' : submissions[item.id] ? 'Resubmit answer image' : 'Submit answer image'}
               <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={uploadingId !== null} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void submitAnswer(item.id, file); }} />

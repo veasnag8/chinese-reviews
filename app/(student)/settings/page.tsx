@@ -207,6 +207,7 @@ export default function SettingsPage() {
 
             <Button
               type="submit"
+              variant="warning"
               disabled={isLoading}
               className="w-full"
             >

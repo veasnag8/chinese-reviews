@@ -593,7 +593,7 @@ const onWordUpdate = async (data: WordFormData) => {
             <Button variant="outline" onClick={() => setShowImportDialog(false)} disabled={importing}>
               Cancel
             </Button>
-            <Button onClick={confirmImport} disabled={importing}>
+            <Button variant="warning" onClick={confirmImport} disabled={importing}>
               {importing ? (<><Loader2 size={16} className="animate-spin mr-2" /> Importing...</>) : (`Import ${importPreview.length} Words`)}
             </Button>
           </div>
@@ -624,7 +624,7 @@ const onWordUpdate = async (data: WordFormData) => {
           </h2>
 
           <div className="word-toolbar-grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
-            <label className="flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-center text-sm font-medium text-sky-700 hover:bg-sky-100 sm:px-4"
+            <label className="flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-400 px-3 py-2 text-center text-sm font-semibold text-amber-950 hover:bg-amber-500 sm:px-4"
               onClick={() => { if (fileInputRef.current) fileInputRef.current.value = ''; }}
             >
               <Upload size={17} />
@@ -639,7 +639,7 @@ const onWordUpdate = async (data: WordFormData) => {
               />
             </label>
             <Button
-              variant="outline"
+              variant="warning"
               type="button"
               className="min-h-10 w-full px-3 sm:w-auto"
               disabled={exporting}
@@ -675,7 +675,7 @@ const onWordUpdate = async (data: WordFormData) => {
               )}
             </Button>
             <Button
-              variant="primary"
+              variant="success"
               type="button"
               onClick={startAdd}
               className="min-h-11 w-full px-4 sm:w-auto"
@@ -832,6 +832,7 @@ const onWordUpdate = async (data: WordFormData) => {
               <div className="word-action-grid gap-2 pt-1 sm:flex">
                 <Button
                   type="submit"
+                  variant={editingWord ? "warning" : "success"}
                   disabled={formState === "submitting"}
                   className="min-h-11 w-full px-5 sm:w-auto"
                 >

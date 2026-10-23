@@ -264,7 +264,7 @@ export default function QuizResultsPage() {
                 type="button"
                 onClick={() => downloadCsv(filtered)}
                 disabled={filtered.length === 0}
-                className="inline-flex items-center justify-center gap-1 rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-50 lg:ml-auto"
+                className="inline-flex items-center justify-center gap-1 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-500 disabled:opacity-50 lg:ml-auto"
               >
                 <Download size={15} /> Export CSV
               </button>

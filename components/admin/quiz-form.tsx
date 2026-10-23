@@ -556,7 +556,7 @@ export function QuizForm({ initial }: QuizFormProps) {
                     <button
                       type="button"
                       onClick={deselectAllFilteredWords}
-                      className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-stone-100"
+                      className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
                     >
                       Clear
                     </button>
@@ -628,7 +628,7 @@ export function QuizForm({ initial }: QuizFormProps) {
                     <button
                       type="button"
                       onClick={deselectAllFilteredSentences}
-                      className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-stone-100"
+                      className="rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
                     >
                       Clear
                     </button>
@@ -698,7 +698,7 @@ export function QuizForm({ initial }: QuizFormProps) {
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-bold">Questions ({questions.length})</h2>
-          <Button type="button" variant="outline" onClick={addQuestion} className="min-h-10 px-4 shadow-sm">
+          <Button type="button" variant="success" onClick={addQuestion} className="min-h-10 px-4 shadow-sm">
             <Plus size={15} /> Add question
           </Button>
         </div>
@@ -735,7 +735,7 @@ export function QuizForm({ initial }: QuizFormProps) {
                 <button
                   type="button"
                   onClick={() => removeQuestion(qIndex)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700"
+                  className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
                 >
                   <Trash2 size={13} /> Remove
                 </button>
@@ -865,7 +865,7 @@ export function QuizForm({ initial }: QuizFormProps) {
       </section>
 
       <div className="grid grid-cols-2 gap-3 border-t border-stone-200 pt-5 sm:flex sm:items-center">
-        <Button type="submit" disabled={saving} className="min-h-11 w-full bg-[#b91c1c] px-5 text-white shadow-sm hover:bg-[#991b1b] sm:w-auto">
+        <Button type="submit" variant="success" disabled={saving} className="min-h-11 w-full px-5 shadow-sm sm:w-auto">
           {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Save Quiz'}
         </Button>
         <Button

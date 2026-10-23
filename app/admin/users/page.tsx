@@ -134,7 +134,7 @@ export default function AdminUsersPage() {
           <button type="button" onClick={loadUsers} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
             <RefreshCw size={17} /> Refresh
           </button>
-          <button type="button" onClick={() => setShowForm((visible) => !visible)} className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-3 text-sm font-semibold text-white">
+          <button type="button" onClick={() => setShowForm((visible) => !visible)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
             <Plus size={17} /> Create student
           </button>
         </div>
@@ -153,7 +153,7 @@ export default function AdminUsersPage() {
             <label className="text-sm font-semibold text-slate-700">Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal outline-none focus:border-[#b91c1c]" /></label>
             <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Temporary password<input required minLength={6} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal outline-none focus:border-[#b91c1c]" /></label>
           </div>
-          <button disabled={busy} className="mt-4 rounded-lg bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Creating...' : 'Create account'}</button>
+          <button disabled={busy} className="mt-4 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? 'Creating...' : 'Create account'}</button>
         </form>
       )}
 
@@ -174,7 +174,7 @@ export default function AdminUsersPage() {
             <label className="mt-4 block text-sm font-semibold">Full name<input value={editingUser.fullName} onChange={(event) => setEditingUser({ ...editingUser, fullName: event.target.value })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal" /></label>
             <label className="mt-4 block text-sm font-semibold">Email<input required type="email" value={editingUser.email} onChange={(event) => setEditingUser({ ...editingUser, email: event.target.value })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal" /></label>
             <label className="mt-4 block text-sm font-semibold">Role<select value={editingUser.role} onChange={(event) => setEditingUser({ ...editingUser, role: event.target.value as AdminUser['role'] })} className="mt-1.5 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal"><option value="student">Student</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select></label>
-            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setEditingUser(null)} className="rounded-lg px-4 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-lg bg-[#b91c1c] px-4 py-2 text-sm font-semibold text-white">Save changes</button></div>
+            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setEditingUser(null)} className="rounded-lg px-4 py-2 text-sm">Cancel</button><button disabled={busy} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Save changes</button></div>
           </form>
         </div>
       )}

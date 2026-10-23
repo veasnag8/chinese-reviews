@@ -119,7 +119,7 @@ export default function AdminClassesPage() {
           <label className="text-sm font-semibold sm:col-span-2">What will students learn?<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Greetings, classroom words, and writing practice" className="mt-1.5 min-h-24 w-full rounded-lg border border-stone-200 px-3 py-2.5 font-normal" /></label>
         </div>
         <div className="mt-4 flex gap-2">
-          <button disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-[#b91c1c] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Saving...' : editingId ? 'Save changes' : 'Save class'}</button>
+          <button disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? 'Saving...' : editingId ? 'Save changes' : 'Save class'}</button>
           {editingId && <button type="button" onClick={resetForm} disabled={busy} className="rounded-lg border border-stone-200 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:opacity-50">Cancel</button>}
         </div>
       </form>
