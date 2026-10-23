@@ -222,26 +222,26 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-7">
+    <div className="min-w-0 space-y-5 sm:space-y-7">
       <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-        <div>
+        <div className="min-w-0">
           <p className="mb-1 text-sm font-medium text-[#b91c1c]">
             {now ? formatHeadlineDate(now) : '\u00a0'}
           </p>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="break-words text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
             {now ? greetingForHour(now.getHours()) : 'Welcome'}
             {fullName ? `, ${fullName}` : ''} 👋
           </h1>
-          <p className="mt-2 text-slate-500">A calm review today makes tomorrow easier.</p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 sm:text-base">A calm review today makes tomorrow easier.</p>
         </div>
         <Link
           href="/words?add=1"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-3 text-sm font-semibold text-white"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-3 text-sm font-semibold text-white sm:w-auto"
         >
           Add what you learned <ArrowRight size={17} />
         </Link>
       </section>
-      <section className={`overflow-hidden rounded-3xl p-6 text-white sm:p-8 ${reviewCompletedToday ? 'bg-gradient-to-br from-emerald-800 to-teal-900' : 'bg-[#8f1717]'}`}>
+      <section className={`min-w-0 overflow-hidden rounded-3xl p-5 text-white sm:p-8 ${reviewCompletedToday ? 'bg-gradient-to-br from-emerald-800 to-teal-900' : 'bg-[#8f1717]'}`}>
         <div className="grid gap-6 md:grid-cols-[1fr_auto]">
           <div>
             <div className="mb-4 flex size-11 items-center justify-center rounded-2xl bg-white/15">
@@ -250,7 +250,7 @@ export default function DashboardPage() {
             <p className="text-sm font-semibold tracking-wide text-white/80">
               {reviewCompletedToday ? 'TODAY ALREADY REVIEWED' : "TODAY'S REVIEW"}
             </p>
-            <h2 className="mt-2 text-3xl font-bold">
+            <h2 className="mt-2 text-2xl font-bold leading-tight sm:text-3xl">
               {reviewCompletedToday ? 'Review Completed Today' : `${stats.dueCount} items ready`}
             </h2>
             <p className="mt-2 max-w-md text-white/80">

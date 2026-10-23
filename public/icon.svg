@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="224" fill="#b91c1c"/>
+  <path d="M170 156h684c38 0 70 32 70 70v572c0 38-32 70-70 70H170c-38 0-70-32-70-70V226c0-38 32-70 70-70Z" fill="#c81e1e"/>
+  <circle cx="512" cy="512" r="330" fill="#a81414" opacity=".35"/>
+  <text x="512" y="665" text-anchor="middle" font-family="Arial, 'Noto Sans CJK SC', sans-serif" font-size="520" font-weight="700" fill="#fff">汉</text>
+</svg>

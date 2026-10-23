@@ -22,10 +22,13 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
+  width: 100%;
   min-height: 100vh;
+  overflow-x: hidden;
   background: radial-gradient(circle at top, #ffffff 0%, #f3f7fb 30%, #eef1f5 100%);
   color: hsl(var(--foreground));
   font-family: var(--font-khmer), "Noto Sans Khmer", "Khmer OS System", system-ui, sans-serif;
@@ -35,6 +38,25 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.app-safe-shell {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.mobile-safe-nav {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(0.25rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.25rem, env(safe-area-inset-right, 0px));
 }
 
 input::placeholder {

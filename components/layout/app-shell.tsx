@@ -300,7 +300,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
-  return <div className="min-h-screen bg-[#f7f6f3] text-slate-900">
+  return <div className="app-safe-shell min-h-screen min-w-0 overflow-x-hidden bg-[#f7f6f3] text-slate-900">
     <aside className="fixed inset-y-0 hidden w-64 border-r border-stone-200 bg-white px-4 py-6 md:flex md:flex-col">
       <Link href="/dashboard" className="mb-9 flex shrink-0 items-center gap-3 px-2"><span className="grid size-9 place-items-center rounded-xl bg-[#b91c1c] text-lg text-white">汉</span><span className="font-semibold tracking-wide">CHINESE REVIEW</span></Link>
       <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-scroll overscroll-contain pr-2 [scrollbar-gutter:stable]">
@@ -311,10 +311,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>}
       </nav>
     </aside>
-    <main className="pb-24 md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto max-w-7xl p-4 sm:p-6 md:p-8">{children}</div></main>
+    <main className="min-w-0 overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto min-w-0 max-w-7xl px-4 py-4 sm:p-6 md:p-8">{children}</div></main>
     
     {/* Mobile bottom nav - 5 main items + menu */}
-    <nav className="fixed inset-x-0 bottom-0 z-10 flex items-center justify-between border-t border-stone-200 bg-white px-2 py-2 md:hidden">
+    <nav className="mobile-safe-nav fixed inset-x-0 bottom-0 z-10 flex items-center justify-between border-t border-stone-200 bg-white px-1 pt-2 md:hidden">
       {mobileNavItems.map(({ href, label, icon: Icon }) => (
         <Link
           key={href}

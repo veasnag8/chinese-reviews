@@ -12,6 +12,8 @@ const notoSansKhmer = Noto_Sans_Khmer({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
   themeColor: "#b91c1c",
   interactiveWidget: "resizes-content",
 };
