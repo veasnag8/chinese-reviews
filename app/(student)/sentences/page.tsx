@@ -44,6 +44,7 @@ export default function SentencesPage() {
   const [sentences, setSentences] = useState<any[]>([]);
   const [activeType, setActiveType] = useState<'single' | 'conversation'>('single');
   const [classes, setClasses] = useState<any[]>([]);
+  const [conversationDate, setConversationDate] = useState('');
   const [isStaff, setIsStaff] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -245,6 +246,7 @@ export default function SentencesPage() {
 
   const startAdding = (type: 'single' | 'conversation' = activeType) => {
     setFormState('idle');
+    setConversationDate('');
     reset({
       sentenceType: type,
       speakerOneName: '',
@@ -258,6 +260,11 @@ export default function SentencesPage() {
     });
     setIsAdding(true);
   };
+
+  const availableClassDates = [...new Set(classes.map((item) => item.date).filter(Boolean))].sort((a, b) => String(b).localeCompare(String(a)));
+  const selectableClasses = watch('sentenceType') === 'conversation' && conversationDate
+    ? classes.filter((item) => item.date === conversationDate)
+    : classes;
 
   const onAddSentence = async (data: SentenceFormData) => {
     if (!user) return;
@@ -435,7 +442,7 @@ export default function SentencesPage() {
       <div className="max-w-7xl mx-auto p-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
           <h2 className="text-2xl font-bold text-foreground">
-            My Sentences
+            {activeType === 'conversation' ? 'My Conversation' : 'My Sentences'}
           </h2>
 
           <div className="flex flex-wrap gap-2">
@@ -486,28 +493,44 @@ export default function SentencesPage() {
                     { value: "single", label: "Single Sentence" },
                     { value: "conversation", label: "Conversation" },
                   ]}
-                  onChange={(event) => setValue("sentenceType", event.target.value as 'single' | 'conversation')}
+                  onChange={(event) => {
+                    const type = event.target.value as 'single' | 'conversation';
+                    setValue("sentenceType", type);
+                    setValue("classId", '');
+                    setConversationDate('');
+                  }}
                 />
               </label>
+              {watch("sentenceType") === 'conversation' && <label className="text-sm font-medium">
+                Date
+                <Select
+                  value={conversationDate}
+                  options={[{ value: '', label: 'Choose a conversation date' }, ...availableClassDates.map((date) => ({ value: String(date), label: String(date) }))]}
+                  onChange={(event) => { setConversationDate(event.target.value); setValue('classId', ''); }}
+                  required
+                />
+                <span className="mt-1 block text-xs text-muted-foreground">Only dates available in My Classes are shown.</span>
+              </label>}
               <label className="text-sm font-medium">
-                Class
+                My Class
                 <Select
                   value={watch("classId") || ""}
                   options={[
-                    { value: "", label: "Select a class" },
-                    ...classes.map((cls: any) => ({
+                    { value: "", label: watch("sentenceType") === 'conversation' && !conversationDate ? "Choose a date first" : "Select from My Classes" },
+                    ...selectableClasses.map((cls: any) => ({
                       value: cls.id,
-                      label: cls.date ? `${cls.date} — ${cls.name}` : cls.name,
+                      label: cls.name,
                     })),
                   ]}
                   onChange={(event) => {
                     const value = event.target.value;
                     setValue("classId", value || undefined);
                   }}
+                  disabled={watch("sentenceType") === 'conversation' && !conversationDate}
                   required
                 />
                 <span className="mt-1 block text-xs text-muted-foreground">
-                  Sentences are assigned to this class and shared with its students.
+                  Select an existing class from My Classes. No lesson or sub-task is required.
                 </span>
               </label>
             </div>
