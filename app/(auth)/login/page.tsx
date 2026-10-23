@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, BookOpen, LockKeyhole, Mail } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { Suspense, useState } from "react";
+import { ArrowRight, BookOpen, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+
+function BrandMark({ inverse = false }: { inverse?: boolean }) {
+  return <div className="flex items-center gap-3 font-bold tracking-wide"><span className={`grid size-11 place-items-center rounded-2xl text-xl shadow-sm ${inverse ? "bg-white text-[#b91c1c]" : "bg-[#b91c1c] text-white"}`}>汉</span><span>CHINESE REVIEW</span></div>;
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -11,117 +15,62 @@ function LoginForm() {
   const redirect = searchParams.get("redirect") || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setBusy(true);
     setMessage("");
-
     if (!supabase) {
-      setMessage("Supabase is not configured yet. Add its public keys to .env.local.");
+      setMessage("The sign-in service is not configured yet.");
       setBusy(false);
       return;
     }
-
     try {
-      const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         setMessage(error.message);
         setBusy(false);
         return;
       }
-
-      console.log('Login successful, user:', data.user?.email);
-      console.log('Session:', data.session);
-      
-      router.push(redirect);
+      router.replace(redirect);
       router.refresh();
-    } catch (err) {
-      console.error('Login error:', err);
-      setMessage('An unexpected error occurred. Please try again.');
+    } catch {
+      setMessage("Unable to sign in right now. Please check your connection and try again.");
       setBusy(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#fbfaf8] p-4 sm:p-8">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-6xl overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-[0_24px_80px_rgba(45,32,20,0.10)] lg:grid-cols-2">
-        <section className="relative hidden overflow-hidden bg-[#8f1717] p-12 text-white lg:block">
-          <div className="absolute -right-32 -top-32 size-96 rounded-full border-[60px] border-red-800/60" />
-          <div className="relative">
-            <div className="flex items-center gap-3 font-semibold tracking-wide">
-              <span className="grid size-10 place-items-center rounded-xl bg-white text-xl text-[#b91c1c]">汉</span>
-              CHINESE REVIEW
-            </div>
-            <div className="mt-32 max-w-md">
-              <p className="text-sm font-semibold tracking-[0.18em] text-red-200">YOUR CLASSROOM COMPANION</p>
-              <h1 className="mt-5 text-5xl font-bold leading-tight">
-                Learn it today.
-                <br />
-                Remember it tomorrow.
-              </h1>
-              <p className="mt-6 text-lg leading-8 text-red-100">
-                Keep every word, sentence, and review session from Chinese class beautifully organized.
-              </p>
-            </div>
-            <div className="mt-20 flex items-center gap-3 text-sm text-red-100">
-              <BookOpen size={19} /> Chinese · Pinyin · Khmer · English
-            </div>
+    <main className="login-safe-area min-h-[100dvh] overflow-hidden bg-[#f7f3ef] lg:p-7">
+      <div className="mx-auto grid min-h-[100dvh] max-w-6xl overflow-hidden bg-white lg:min-h-[calc(100dvh-3.5rem)] lg:grid-cols-[1.05fr_0.95fr] lg:rounded-[2rem] lg:border lg:border-stone-200 lg:shadow-[0_30px_90px_rgba(69,31,23,0.14)]">
+        <section className="relative overflow-hidden bg-gradient-to-br from-[#a51616] via-[#b91c1c] to-[#741010] px-6 pb-16 pt-7 text-white sm:px-10 lg:p-12">
+          <div className="absolute -right-20 -top-24 size-72 rounded-full border-[42px] border-white/5 lg:size-96 lg:border-[60px]" />
+          <div className="absolute -bottom-32 -left-24 size-72 rounded-full bg-black/10 blur-sm" />
+          <div className="relative z-10"><BrandMark inverse /></div>
+          <div className="relative z-10 mt-12 max-w-md sm:mt-16 lg:mt-28">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-red-50 backdrop-blur"><Sparkles size={14} /> Learn a little every day</div>
+            <h1 className="mt-5 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">Learn today.<br />Remember tomorrow.</h1>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-red-100 sm:text-base lg:text-lg lg:leading-8">Your Chinese words, conversations, homework, and reviews—all in one calm place.</p>
           </div>
+          <div className="relative z-10 mt-8 hidden items-center gap-3 text-sm text-red-100 lg:flex"><BookOpen size={19} /> Chinese · Pinyin · Khmer · English</div>
         </section>
-        <section className="flex items-center justify-center p-7 sm:p-12">
-          <div className="w-full max-w-sm">
-            <div className="mb-10 lg:hidden">
-              <div className="flex items-center gap-2 font-semibold">
-                <span className="grid size-9 place-items-center rounded-xl bg-[#b91c1c] text-white">汉</span>
-                CHINESE REVIEW
-              </div>
-            </div>
-            <p className="text-sm font-semibold tracking-wider text-[#b91c1c]">WELCOME BACK</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight">Sign in to continue</h2>
-            <p className="mt-3 text-slate-500">Pick up right where your last review ended.</p>
-            {message && <p className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{message}</p>}
-            <form onSubmit={submit} className="mt-8 space-y-5">
-              <label className="block text-sm font-semibold text-slate-700">
-                Email address
-                <span className="relative mt-2 block">
-                  <Mail className="absolute left-3 top-3 text-slate-400" size={18} />
-                  <input
-                    required
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full rounded-xl border border-stone-200 py-2.5 pl-10 pr-3 outline-none transition focus:border-[#b91c1c] focus:ring-4 focus:ring-red-50"
-                  />
-                </span>
-              </label>
-              <label className="block text-sm font-semibold text-slate-700">
-                Password
-                <span className="relative mt-2 block">
-                  <LockKeyhole className="absolute left-3 top-3 text-slate-400" size={18} />
-                  <input
-                    required
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Your password"
-                    className="w-full rounded-xl border border-stone-200 py-2.5 pl-10 pr-3 outline-none transition focus:border-[#b91c1c] focus:ring-4 focus:ring-red-50"
-                  />
-                </span>
-              </label>
-              <button
-                disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#b91c1c] py-3 font-semibold text-white transition hover:bg-red-800 disabled:opacity-50"
-              >
-                {busy ? "Signing in…" : "Sign in"} <ArrowRight size={18} />
-              </button>
+
+        <section className="relative -mt-7 flex items-start justify-center rounded-t-[2rem] bg-white px-5 pb-10 pt-8 sm:px-10 lg:mt-0 lg:items-center lg:rounded-none lg:p-12">
+          <div className="w-full max-w-md">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b91c1c]">Welcome back</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Sign in to continue</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">Pick up right where your last review ended.</p>
+            {message && <p role="alert" className="mt-5 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">{message}</p>}
+
+            <form onSubmit={submit} className="mt-7 space-y-5">
+              <label className="block text-sm font-semibold text-slate-700">Email address<span className="relative mt-2 block"><Mail className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} /><input required autoComplete="email" inputMode="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" className="min-h-14 w-full rounded-2xl border border-stone-200 bg-stone-50/70 py-3 pl-12 pr-4 text-base outline-none transition focus:border-[#b91c1c] focus:bg-white focus:ring-4 focus:ring-red-50" /></span></label>
+              <label className="block text-sm font-semibold text-slate-700">Password<span className="relative mt-2 block"><LockKeyhole className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} /><input required autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" className="min-h-14 w-full rounded-2xl border border-stone-200 bg-stone-50/70 py-3 pl-12 pr-12 text-base outline-none transition focus:border-[#b91c1c] focus:bg-white focus:ring-4 focus:ring-red-50" /><button type="button" onClick={() => setShowPassword((shown) => !shown)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-xl text-slate-400 hover:bg-stone-100 hover:text-slate-700">{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></span></label>
+              <button type="submit" disabled={busy} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#b91c1c] px-4 font-semibold text-white shadow-lg shadow-red-900/15 transition hover:bg-[#991b1b] active:scale-[0.99] disabled:cursor-wait disabled:opacity-70">{busy ? <><LoaderCircle className="animate-spin" size={20} /> Signing in…</> : <>Sign in <ArrowRight size={19} /></>}</button>
             </form>
-            <p className="mt-7 text-center text-sm text-slate-500">
-              Need an account? Contact your admin to create one for you.
-            </p>
+            <p className="mt-6 text-center text-sm leading-6 text-slate-500">Need an account? Contact your administrator.</p>
           </div>
         </section>
       </div>
@@ -129,12 +78,10 @@ function LoginForm() {
   );
 }
 
-import { Suspense } from "react";
+function LoginLoading() {
+  return <div className="grid min-h-[100dvh] place-items-center bg-[#b91c1c] text-white"><div className="text-center"><span className="mx-auto grid size-20 place-items-center rounded-[1.75rem] bg-white text-4xl font-bold text-[#b91c1c] shadow-xl">汉</span><p className="mt-5 font-bold tracking-[0.18em]">CHINESE REVIEW</p><LoaderCircle className="mx-auto mt-5 animate-spin text-red-200" size={24} /></div></div>;
+}
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading…</div>}>
-      <LoginForm />
-    </Suspense>
-  );
+  return <Suspense fallback={<LoginLoading />}><LoginForm /></Suspense>;
 }

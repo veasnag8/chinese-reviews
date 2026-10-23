@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732">
+  <rect width="2732" height="2732" fill="#b91c1c"/>
+  <circle cx="1366" cy="1190" r="510" fill="#ffffff" opacity=".08"/>
+  <rect x="1016" y="840" width="700" height="700" rx="180" fill="#ffffff"/>
+  <text x="1366" y="1370" text-anchor="middle" font-family="Arial, 'Noto Sans CJK SC', sans-serif" font-size="480" font-weight="700" fill="#b91c1c">汉</text>
+  <text x="1366" y="1740" text-anchor="middle" font-family="Arial, sans-serif" font-size="112" font-weight="700" letter-spacing="18" fill="#ffffff">CHINESE REVIEW</text>
+  <text x="1366" y="1865" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" fill="#fecaca">LEARN • REVIEW • REMEMBER</text>
+</svg>
