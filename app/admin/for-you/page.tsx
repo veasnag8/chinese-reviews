@@ -1,7 +1,7 @@
 'use client';
 
 import { ClipboardEvent, FormEvent, useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ClipboardPaste, Clock3, ImageIcon, Loader2, NotebookPen, Pencil, Plus, Send, Trash2, Upload, X } from 'lucide-react';
+import { CheckCircle2, ClipboardPaste, Clock3, ImageIcon, Loader2, NotebookPen, Pencil, Plus, RotateCcw, Send, Trash2, Upload, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type Assignment = {
@@ -19,9 +19,10 @@ type Submission = {
   assignment_id: string;
   user_id: string;
   answer_image_path: string;
-  status: 'pending_checking' | 'checked';
+  status: 'pending_checking' | 'needs_revision' | 'checked';
   submitted_at: string;
   checked_at: string | null;
+  remark: string | null;
 };
 
 type StudentProfile = {
@@ -52,6 +53,7 @@ export default function AdminForYouPage() {
   const [submissionUrls, setSubmissionUrls] = useState<Record<string, string>>({});
   const [studentProfiles, setStudentProfiles] = useState<Record<string, StudentProfile>>({});
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm);
   const [formOpen, setFormOpen] = useState(false);
@@ -78,13 +80,14 @@ export default function AdminForYouPage() {
       setImageUrls(Object.fromEntries(urls));
 
       const { data: submissionData, error: submissionError } = await (supabase.from('homework_submissions') as any)
-        .select('id, assignment_id, user_id, answer_image_path, status, submitted_at, checked_at')
+        .select('id, assignment_id, user_id, answer_image_path, status, submitted_at, checked_at, remark')
         .order('submitted_at', { ascending: false });
       if (submissionError) {
         setMessage(submissionError.message);
       } else {
         const submissionRows = (submissionData || []) as Submission[];
         setSubmissions(submissionRows);
+        setRemarks(Object.fromEntries(submissionRows.map((submission) => [submission.id, submission.remark || ''])));
         const userIds = [...new Set(submissionRows.map((submission) => submission.user_id))];
         if (userIds.length > 0) {
           const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds);
@@ -218,8 +221,8 @@ export default function AdminForYouPage() {
     setMessage('Homework deleted.');
   };
 
-  const markSubmissionChecked = async (submission: Submission) => {
-    if (!supabase || submission.status === 'checked') return;
+  const reviewSubmission = async (submission: Submission, status: 'needs_revision' | 'checked') => {
+    if (!supabase) return;
     setCheckingId(submission.id);
     setMessage('');
     const { data: auth } = await supabase.auth.getUser();
@@ -228,14 +231,15 @@ export default function AdminForYouPage() {
       setCheckingId(null);
       return;
     }
-    const checkedAt = new Date().toISOString();
+    const checkedAt = status === 'checked' ? new Date().toISOString() : null;
+    const remark = remarks[submission.id]?.trim() || null;
     const { error } = await (supabase.from('homework_submissions') as any)
-      .update({ status: 'checked', checked_at: checkedAt, checked_by: auth.user.id })
+      .update({ status, remark, checked_at: checkedAt, checked_by: auth.user.id })
       .eq('id', submission.id);
     if (error) setMessage(error.message);
     else {
-      setSubmissions((current) => current.map((item) => item.id === submission.id ? { ...item, status: 'checked', checked_at: checkedAt } : item));
-      setMessage('Student submission marked as checked.');
+      setSubmissions((current) => current.map((item) => item.id === submission.id ? { ...item, status, remark, checked_at: checkedAt } : item));
+      setMessage(status === 'checked' ? 'Student submission marked as checked.' : 'Student was asked to check and resubmit the homework.');
     }
     setCheckingId(null);
   };
@@ -435,6 +439,7 @@ export default function AdminForYouPage() {
               const student = studentProfiles[submission.user_id];
               const assignment = assignments.find((item) => item.id === submission.assignment_id);
               const isChecked = submission.status === 'checked';
+              const needsRevision = submission.status === 'needs_revision';
               return (
                 <article key={submission.id} className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
                   <a href={submissionUrls[submission.id] || undefined} target="_blank" rel="noreferrer" className="flex aspect-[4/3] items-center justify-center bg-stone-100">
@@ -443,15 +448,18 @@ export default function AdminForYouPage() {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0"><h3 className="truncate font-bold text-slate-900">{student?.full_name || student?.email || 'Student'}</h3>{student?.full_name && student.email && <p className="truncate text-xs text-slate-500">{student.email}</p>}</div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isChecked ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{isChecked ? 'Checked' : 'Pending'}</span>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${isChecked ? 'bg-emerald-50 text-emerald-700' : needsRevision ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{isChecked ? 'Checked' : needsRevision ? 'Check Again' : 'Pending'}</span>
                     </div>
                     <p className="mt-3 text-sm font-semibold text-slate-700">{assignment?.title || 'Deleted homework'}</p>
                     <p className="mt-1 text-xs text-slate-500">Submitted {formatDate(submission.submitted_at)}</p>
-                    {isChecked ? (
-                      <div className="mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-semibold text-emerald-700"><CheckCircle2 size={17} /> Checked{submission.checked_at ? ` · ${formatDate(submission.checked_at)}` : ''}</div>
-                    ) : (
-                      <button type="button" disabled={checkingId !== null} onClick={() => void markSubmissionChecked(submission)} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-amber-950 hover:bg-amber-500 disabled:opacity-50">{checkingId === submission.id ? <Loader2 className="animate-spin" size={17} /> : <CheckCircle2 size={17} />}{checkingId === submission.id ? 'Saving…' : 'Mark as checked'}</button>
-                    )}
+                    <label className="mt-4 block text-sm font-semibold text-slate-700">Remark <span className="font-normal text-slate-400">(optional)</span>
+                      <textarea value={remarks[submission.id] || ''} onChange={(event) => setRemarks((current) => ({ ...current, [submission.id]: event.target.value }))} rows={2} placeholder="Write feedback for the student" className="mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2 font-normal outline-none focus:border-amber-400" />
+                    </label>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button type="button" disabled={checkingId !== null} onClick={() => void reviewSubmission(submission, 'needs_revision')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">{checkingId === submission.id ? <Loader2 className="animate-spin" size={17} /> : <RotateCcw size={17} />}Check Again</button>
+                      <button type="button" disabled={checkingId !== null || isChecked} onClick={() => void reviewSubmission(submission, 'checked')} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"><CheckCircle2 size={17} />{isChecked ? 'Checked' : 'Checked'}</button>
+                    </div>
+                    {isChecked && submission.checked_at && <p className="mt-2 text-center text-xs text-emerald-700">Checked · {formatDate(submission.checked_at)}</p>}
                   </div>
                 </article>
               );

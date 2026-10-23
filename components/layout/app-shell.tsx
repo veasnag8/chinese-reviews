@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           client.from('quizzes').select('id, start_at, deadline').eq('status', 'active'),
           client.from('quiz_submissions').select('quiz_id').eq('user_id', auth.user.id).eq('status', 'submitted'),
           client.from('for_you_assignments').select('id').lte('starts_at', nowIso).gt('expires_at', nowIso),
-          client.from('homework_submissions').select('assignment_id').eq('user_id', auth.user.id),
+          client.from('homework_submissions').select('assignment_id, status').eq('user_id', auth.user.id),
           client.from('words').select('id', { count: 'exact', head: true }).gt('created_at', wordsSeenAt),
           client.from('sentences').select('id', { count: 'exact', head: true }).gt('created_at', sentencesSeenAt),
         ]);
@@ -117,7 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         if (!newWords.error) setWordCount(newWords.count || 0);
         if (!newSentences.error) setSentenceCount(newSentences.count || 0);
         if (!homework.error && !homeworkSubmissions.error) {
-          const completedHomework = new Set((homeworkSubmissions.data || []).map((row: { assignment_id: string }) => row.assignment_id));
+          const completedHomework = new Set((homeworkSubmissions.data || []).filter((row: { status: string }) => row.status !== 'needs_revision').map((row: { assignment_id: string }) => row.assignment_id));
           setHomeworkCount((homework.data || []).filter((item: { id: string }) => !completedHomework.has(item.id)).length);
         }
         if (quizzes.error || submissions.error) return;

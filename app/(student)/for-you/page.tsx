@@ -22,9 +22,10 @@ type Submission = {
   id: string;
   assignment_id: string;
   answer_image_path: string;
-  status: 'pending_checking' | 'checked';
+  status: 'pending_checking' | 'needs_revision' | 'checked';
   submitted_at: string;
   checked_at: string | null;
+  remark: string | null;
 };
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -61,7 +62,7 @@ export default function ForYouPage() {
       const assignments = (data || []) as Assignment[];
       setItems(assignments);
       const { data: submissionData, error: submissionError } = await (supabase.from('homework_submissions') as any)
-        .select('id, assignment_id, answer_image_path, status, submitted_at, checked_at');
+        .select('id, assignment_id, answer_image_path, status, submitted_at, checked_at, remark');
       if (submissionError) setError(submissionError.message);
       const submissionRows = (submissionData || []) as Submission[];
       setSubmissions(Object.fromEntries(submissionRows.map((row) => [row.assignment_id, row])));
@@ -112,6 +113,7 @@ export default function ForYouPage() {
       user_id: auth.user.id,
       answer_image_path: path,
       status: 'pending_checking',
+      remark: null,
       submitted_at: new Date().toISOString(),
       checked_at: null,
       checked_by: null,
@@ -160,14 +162,16 @@ export default function ForYouPage() {
             <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 size={14} /> Available until {new Date(item.expires_at).toLocaleString()}</p>
             {submissions[item.id] && (
               <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-500">Your submitted answer</span><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${submissions[item.id].status === 'checked' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{submissions[item.id].status === 'checked' ? <CheckCircle2 size={13} /> : <Clock3 size={13} />}{submissions[item.id].status === 'checked' ? 'Checked' : 'Pending Checking'}</span></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-500">Your submitted answer</span><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${submissions[item.id].status === 'checked' ? 'bg-emerald-100 text-emerald-700' : submissions[item.id].status === 'needs_revision' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{submissions[item.id].status === 'checked' ? <CheckCircle2 size={13} /> : <Clock3 size={13} />}{submissions[item.id].status === 'checked' ? 'Checked' : submissions[item.id].status === 'needs_revision' ? 'Check Again' : 'Pending Checking'}</span></div>
+                {submissions[item.id].status === 'needs_revision' && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><p className="font-semibold">Please check your homework again before resubmit.</p>{submissions[item.id].remark && <p className="mt-1 whitespace-pre-wrap">Remark: {submissions[item.id].remark}</p>}</div>}
+                {submissions[item.id].status === 'checked' && submissions[item.id].remark && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><span className="font-semibold">Teacher remark:</span> {submissions[item.id].remark}</div>}
                 {answerUrls[item.id] && <a href={answerUrls[item.id]} target="_blank" rel="noreferrer"><img src={answerUrls[item.id]} alt="Your homework answer" className="mt-3 max-h-48 w-full rounded-lg object-contain" /></a>}
               </div>
             )}
             <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-500 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
               {uploadingId === item.id ? <Loader2 size={16} className="animate-spin" /> : submissions[item.id] ? <Upload size={16} /> : <Send size={16} />}
-              {uploadingId === item.id ? 'Uploading...' : submissions[item.id] ? 'Resubmit answer image' : 'Submit answer image'}
-              <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={uploadingId !== null} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void submitAnswer(item.id, file); }} />
+              {uploadingId === item.id ? 'Uploading...' : submissions[item.id]?.status === 'checked' ? 'Homework checked' : submissions[item.id] ? 'Resubmit answer image' : 'Submit answer image'}
+              <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={uploadingId !== null || submissions[item.id]?.status === 'checked'} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void submitAnswer(item.id, file); }} />
             </label>
             <p className="mt-2 flex items-center justify-center gap-1 text-xs text-slate-400"><ImageIcon size={13} /> JPEG, PNG or WebP · Max 5 MB</p>
           </article>
