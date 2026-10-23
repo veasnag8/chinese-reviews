@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Check, CheckCircle2, PenLine, Trophy, Volume2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { pickSimilarDistractors, shuffleChoices, type QuizMeaning } from '@/lib/quiz/distractors';
+import { speakChinese as speak } from '@/lib/speech';
 
 type QuizQuestion = {
   id: string;
@@ -33,15 +34,6 @@ type WordItem = {
   category?: string | null;
   class_id?: string | null;
   className?: string | null;
-};
-
-const speak = (text: string) => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.8;
-  window.speechSynthesis.speak(utterance);
 };
 
 export default function ReviewPage() {

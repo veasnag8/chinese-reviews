@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Volume2, ChevronRight, Check, X, Sparkles, RotateCcw, Mic, MicOff, ArrowLeft } from 'lucide-react';
 import HanziWriter from 'hanzi-writer';
+import { speakChinese as speak } from '@/lib/speech';
 
 type LearningWord = {
   id: string;
@@ -34,15 +35,6 @@ type ClassOption = {
 };
 
 type LearningStep = 'select-date' | 'teach-words' | 'practice-writing' | 'speak-word' | 'show-sentences' | 'complete';
-
-const speak = (text: string) => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.8;
-  window.speechSynthesis.speak(utterance);
-};
 
 type SpeechRecognitionInstance = {
   lang: string;

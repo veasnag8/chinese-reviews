@@ -6,15 +6,7 @@ import HanziWriter from 'hanzi-writer';
 import { Check, ChevronRight, ChevronDown, Eye, EyeOff, RotateCcw, Search, Volume2, X, ArrowLeft } from 'lucide-react';
 import { initialWords, type StudyWord } from '@/lib/demo-data';
 import { supabase } from '@/lib/supabase';
-
-const speak = (text: string) => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.75;
-  window.speechSynthesis.speak(utterance);
-};
+import { speakChinese as speak } from '@/lib/speech';
 
 function WritingPage() {
   const searchParams = useSearchParams();

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
+import { speakChinese as speakSentence } from '@/lib/speech';
 
 type GameSentence = {
   id: string;
@@ -86,28 +87,6 @@ function shuffleArray<T>(array: T[]): T[] {
   }
   return next;
 }
-
-const speakSentence = (text: string, audioUrl?: string | null) => {
-  if (audioUrl) {
-    try {
-      const audio = new Audio(audioUrl);
-      audio.play().catch(() => speakSynthesis(text));
-      return;
-    } catch {
-      // fallback
-    }
-  }
-  speakSynthesis(text);
-};
-
-const speakSynthesis = (text: string) => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.85;
-  window.speechSynthesis.speak(utterance);
-};
 
 export default function SentenceScramblePage() {
   const [allSentences, setAllSentences] = useState<GameSentence[]>([]);

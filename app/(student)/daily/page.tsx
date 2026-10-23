@@ -4,17 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, FileText, Languages, PenLine, Volume2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { speakChinese as speak } from "@/lib/speech";
 
 type Lesson = { id: string; name: string; date: string; description?: string | null; teacher?: string | null };
-
-const speak = (text: string) => {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "zh-CN";
-  utterance.rate = 0.8;
-  window.speechSynthesis.speak(utterance);
-};
 
 export default function DailyPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);

@@ -13,6 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { EmptyState } from "@/components/ui/empty-state";
 import { parseCSV, parseExcel, mapSentenceRow, type SentenceImportRow } from '@/lib/import';
 import { fetchSentenceAutofill } from '@/lib/ai-autofill';
+import { speakChinese as speak } from '@/lib/speech';
 
 const sentenceSchema = z.object({
   sentenceType: z.enum(["single", "conversation"]),
@@ -31,31 +32,6 @@ const sentenceSchema = z.object({
 });
 
 type SentenceFormData = z.infer<typeof sentenceSchema>;
-
-const speakWithSynthesis = (text: string) => {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "zh-CN";
-  utterance.rate = 0.8;
-  window.speechSynthesis.speak(utterance);
-};
-
-const speak = (text: string, audioUrl?: string | null) => {
-  if (audioUrl) {
-    try {
-      const audio = new Audio(audioUrl);
-      audio.play().catch(() => {
-        speakWithSynthesis(text);
-      });
-      return;
-    } catch {
-      speakWithSynthesis(text);
-      return;
-    }
-  }
-  speakWithSynthesis(text);
-};
 
 const isWithinLast24Hours = (createdAt?: string | null) => {
   if (!createdAt) return false;

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, Search, Volume2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { fetchFavoriteIds, toggleFavorite } from '@/lib/favorites';
+import { speakChinese as speak } from '@/lib/speech';
 
 type WordItem = {
   id: string;
@@ -34,15 +35,6 @@ const isWithinLast24Hours = (createdAt?: string | null) => {
   if (Number.isNaN(time)) return false;
   const now = Date.now();
   return now - time <= 24 * 60 * 60 * 1000 && now - time >= 0;
-};
-
-const speak = (text: string) => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.8;
-  window.speechSynthesis.speak(utterance);
 };
 
 export default function WordsPage() {

@@ -1,35 +1,8 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, Clock3, Eye, ImageIcon, Loader2, NotebookPen, RefreshCw, Send, Trash2, Upload } from 'lucide-react';
+import { ClipboardEvent, FormEvent, useState } from 'react';
+import { NotebookPen, Send, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-
-type Assignment = {
-  id: string;
-  title: string;
-  description: string | null;
-  starts_at: string;
-  content_type: 'word' | 'sentence';
-  chinese: string;
-  pinyin: string | null;
-  khmer: string | null;
-  english: string | null;
-  image_path: string | null;
-  expires_at: string;
-  created_at: string;
-};
-
-type HomeworkSubmission = {
-  id: string;
-  assignment_id: string;
-  user_id: string;
-  answer_image_path: string;
-  status: 'pending_checking' | 'checked';
-  submitted_at: string;
-  checked_at: string | null;
-  profiles: { full_name: string | null; email: string } | null;
-  for_you_assignments: { title: string } | null;
-};
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -47,46 +20,10 @@ const emptyForm = () => ({
 });
 
 export default function AdminForYouPage() {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [form, setForm] = useState(emptyForm);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [promptImage, setPromptImage] = useState<File | null>(null);
-  const [submissions, setSubmissions] = useState<HomeworkSubmission[]>([]);
-  const [submissionUrls, setSubmissionUrls] = useState<Record<string, string>>({});
-  const [checkingId, setCheckingId] = useState<string | null>(null);
-
-  const loadData = useCallback(async () => {
-    if (!supabase) return;
-    setLoading(true);
-    setMessage('');
-    const assignmentsResult = await (supabase.from('for_you_assignments') as any)
-      .select('id, title, description, starts_at, content_type, chinese, pinyin, khmer, english, image_path, expires_at, created_at')
-      .order('created_at', { ascending: false });
-    if (assignmentsResult.error) {
-      setMessage(assignmentsResult.error.message || 'Unable to load assignments.');
-    } else {
-      setAssignments((assignmentsResult.data || []) as Assignment[]);
-    }
-    const submissionsResult = await (supabase.from('homework_submissions') as any)
-      .select('id, assignment_id, user_id, answer_image_path, status, submitted_at, checked_at, profiles!homework_submissions_user_id_fkey(full_name, email), for_you_assignments(title)')
-      .order('submitted_at', { ascending: false });
-    if (submissionsResult.error) {
-      setMessage(submissionsResult.error.message || 'Unable to load homework submissions.');
-    } else {
-      const rows = (submissionsResult.data || []) as HomeworkSubmission[];
-      setSubmissions(rows);
-      const urlEntries = await Promise.all(rows.map(async (row) => {
-        const { data: signed } = await supabase.storage.from('homework-files').createSignedUrl(row.answer_image_path, 3600);
-        return [row.id, signed?.signedUrl || ''] as const;
-      }));
-      setSubmissionUrls(Object.fromEntries(urlEntries));
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { void loadData(); }, [loadData]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -150,7 +87,6 @@ export default function AdminForYouPage() {
       setMessage('Homework assigned to every user.');
       setForm(emptyForm());
       setPromptImage(null);
-      await loadData();
     }
     setSaving(false);
   };
@@ -174,43 +110,24 @@ export default function AdminForYouPage() {
     setPromptImage(file);
   };
 
-  const remove = async (assignment: Assignment) => {
-    if (!supabase || !window.confirm(`Delete “${assignment.title}” from every user’s homework?`)) return;
-    const answerPaths = submissions.filter((item) => item.assignment_id === assignment.id).map((item) => item.answer_image_path);
-    const { error } = await (supabase.from('for_you_assignments') as any).delete().eq('id', assignment.id);
-    if (error) setMessage(error.message);
-    else {
-      if (assignment.image_path) await supabase.storage.from('homework-files').remove([assignment.image_path]);
-      if (answerPaths.length > 0) await supabase.storage.from('homework-files').remove(answerPaths);
-      setAssignments((current) => current.filter((item) => item.id !== assignment.id));
-      setSubmissions((current) => current.filter((item) => item.assignment_id !== assignment.id));
+  const pastePromptImage = (event: ClipboardEvent<HTMLElement>) => {
+    const image = Array.from(event.clipboardData.items)
+      .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      ?.getAsFile();
+    if (!image) {
+      setMessage('Copy an image first, then paste it here.');
+      return;
     }
-  };
-
-  const markChecked = async (submission: HomeworkSubmission) => {
-    if (!supabase) return;
-    setCheckingId(submission.id);
-    setMessage('');
-    const { data: auth } = await supabase.auth.getUser();
-    const { error } = await (supabase.from('homework_submissions') as any).update({
-      status: 'checked',
-      checked_at: new Date().toISOString(),
-      checked_by: auth.user?.id || null,
-    }).eq('id', submission.id);
-    if (error) setMessage(error.message);
-    else setSubmissions((current) => current.map((item) => item.id === submission.id ? { ...item, status: 'checked', checked_at: new Date().toISOString() } : item));
-    setCheckingId(null);
+    event.preventDefault();
+    selectPromptImage(image);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Homework management</p>
-          <h1 className="mt-1 text-3xl font-bold">Create Homework</h1>
-          <p className="mt-2 text-slate-500">Create an image homework and choose when students can access it.</p>
-        </div>
-        <button type="button" onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"><RefreshCw size={17} /> Refresh</button>
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Homework management</p>
+        <h1 className="mt-1 text-3xl font-bold">Create Homework</h1>
+        <p className="mt-2 text-slate-500">Create an image homework and choose when students can access it.</p>
       </div>
 
       {message && <p role="status" className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">{message}</p>}
@@ -231,36 +148,12 @@ export default function AdminForYouPage() {
             <input required type="datetime-local" min={form.startsAt} value={form.expiresAt} onChange={(event) => setForm({ ...form, expiresAt: event.target.value })} className="mt-1.5 w-full rounded-xl border border-stone-200 px-3 py-2.5 font-normal" />
           </label>
           <label className="text-sm font-semibold text-slate-700 md:col-span-2">Image
-            <span className="mt-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-5 font-normal text-slate-600 hover:bg-stone-100"><Upload size={18} />{promptImage ? promptImage.name : 'Choose JPEG, PNG or WebP · Max 5 MB'}<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; selectPromptImage(file); }} /></span>
+            <span tabIndex={0} onPaste={pastePromptImage} className="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-5 text-center font-normal text-slate-600 outline-none hover:bg-stone-100 focus:border-[#b91c1c] focus:ring-2 focus:ring-red-100"><span className="flex items-center gap-2"><Upload size={18} />{promptImage ? promptImage.name : 'Choose or paste an image'}</span><span className="text-xs text-slate-400">JPEG, PNG or WebP · Max 5 MB · Ctrl+V / Cmd+V</span><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; selectPromptImage(file); }} /></span>
           </label>
         </div>
         <button disabled={saving} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"><Send size={17} /> {saving ? 'Creating...' : 'Create homework'}</button>
       </form>
 
-      <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-slate-600"><tr><th className="p-4">Audience</th><th className="p-4">Title</th><th className="p-4">Schedule</th><th className="p-4">Status</th><th className="p-4">Action</th></tr></thead>
-          <tbody>
-            {loading ? <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading assignments...</td></tr> : assignments.map((assignment) => {
-              const expired = new Date(assignment.expires_at).getTime() <= Date.now();
-              const upcoming = new Date(assignment.starts_at).getTime() > Date.now();
-              return <tr key={assignment.id} className="border-b border-stone-100 last:border-0"><td className="p-4 font-semibold">All users</td><td className="p-4"><p className="max-w-sm font-semibold">{assignment.title}</p><p className="max-w-sm text-xs text-slate-500">{assignment.description || 'No description'}</p></td><td className="p-4 text-xs text-slate-600"><p>{new Date(assignment.starts_at).toLocaleString()}</p><p className="mt-1">to {new Date(assignment.expires_at).toLocaleString()}</p></td><td className="p-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${expired ? 'bg-stone-100 text-slate-500' : upcoming ? 'bg-sky-50 text-sky-700' : 'bg-emerald-50 text-emerald-700'}`}>{expired ? 'Expired' : upcoming ? 'Scheduled' : 'Active'}</span></td><td className="p-4"><button type="button" onClick={() => void remove(assignment)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700"><Trash2 size={13} /> Delete</button></td></tr>;
-            })}
-            {!loading && assignments.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-slate-500">No homework yet.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
-        <div className="flex items-center justify-between border-b border-stone-200 p-4"><div><h2 className="font-bold">Student submissions</h2><p className="text-xs text-slate-500">Review uploaded answers and mark them as checked.</p></div><span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{submissions.filter((item) => item.status === 'pending_checking').length} pending</span></div>
-        <table className="w-full min-w-[820px] text-left text-sm">
-          <thead className="border-b border-stone-200 bg-stone-50 text-slate-600"><tr><th className="p-4">Student</th><th className="p-4">Homework</th><th className="p-4">Answer</th><th className="p-4">Submitted</th><th className="p-4">Status</th><th className="p-4">Action</th></tr></thead>
-          <tbody>
-            {submissions.map((submission) => <tr key={submission.id} className="border-b border-stone-100 last:border-0"><td className="p-4"><p className="font-semibold">{submission.profiles?.full_name || 'Unnamed student'}</p><p className="text-xs text-slate-500">{submission.profiles?.email}</p></td><td className="p-4 font-medium">{submission.for_you_assignments?.title || 'Homework'}</td><td className="p-4">{submissionUrls[submission.id] ? <a href={submissionUrls[submission.id]} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-semibold text-sky-700 hover:underline"><Eye size={15} /> View image</a> : <span className="text-slate-400">Loading...</span>}</td><td className="p-4 text-slate-600">{new Date(submission.submitted_at).toLocaleString()}</td><td className="p-4"><span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${submission.status === 'checked' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{submission.status === 'checked' ? <CheckCircle2 size={13} /> : <Clock3 size={13} />}{submission.status === 'checked' ? 'Checked' : 'Pending Checking'}</span></td><td className="p-4">{submission.status === 'pending_checking' ? <button type="button" disabled={checkingId === submission.id} onClick={() => void markChecked(submission)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{checkingId === submission.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Mark checked</button> : <span className="text-xs text-slate-500">Completed</span>}</td></tr>)}
-            {!loading && submissions.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-slate-500"><ImageIcon className="mx-auto mb-2 text-stone-300" size={28} />No student submissions yet.</td></tr>}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
