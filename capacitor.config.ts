@@ -8,6 +8,12 @@ const config: CapacitorConfig = {
     url: 'https://chinese-reviews.vercel.app',
     cleartext: false,
   },
+  plugins: {
+    Keyboard: {
+      resize: 'native',
+      resizeOnFullScreen: true,
+    },
+  },
 };
 
 export default config;

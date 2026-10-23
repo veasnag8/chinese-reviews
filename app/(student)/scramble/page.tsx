@@ -360,7 +360,7 @@ export default function SentenceScramblePage() {
     const accuracy = gameSentences.length > 0 ? Math.round((correctCount / gameSentences.length) * 100) : 100;
     return (
       <div className="mx-auto max-w-lg py-12 space-y-6 text-center animate-in fade-in zoom-in-95 duration-300">
-        <div className="rounded-3xl border border-stone-200 bg-white p-8 shadow-sm space-y-6">
+        <div className="space-y-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8">
           <div className="mx-auto grid size-20 place-items-center rounded-full bg-amber-100 text-amber-600 shadow-inner">
             <Trophy size={44} />
           </div>

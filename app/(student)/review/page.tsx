@@ -265,7 +265,7 @@ export default function ReviewPage() {
   if (reviewCompletedToday && !showResults && !completed) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+        <div className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
           <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-amber-50">
             <Trophy className="text-amber-500" size={32} />
           </div>
@@ -342,7 +342,7 @@ export default function ReviewPage() {
   if (showResults) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto max-w-xl rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
           <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-amber-50">
             <Trophy className="text-amber-500" size={32} />
           </div>
@@ -443,7 +443,7 @@ export default function ReviewPage() {
       </div>
       <section className="rounded-3xl border border-stone-200 bg-white p-6 text-center shadow-sm sm:p-10">
         <p className="text-sm text-slate-500">Choose the correct answer</p>
-        <p className="mt-5 text-6xl font-semibold">{question.chinese}</p>
+        <p className="mt-5 text-4xl font-semibold sm:text-6xl">{question.chinese}</p>
         <div className="mt-8 grid gap-3 text-left">
           {question.choices.map((choice, index) => (
             <button

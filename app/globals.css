@@ -27,6 +27,7 @@ html {
 
 body {
   width: 100%;
+  min-width: 0;
   min-height: 100vh;
   overflow-x: hidden;
   background: radial-gradient(circle at top, #ffffff 0%, #f3f7fb 30%, #eef1f5 100%);
@@ -47,6 +48,19 @@ canvas {
   max-width: 100%;
 }
 
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
 .app-safe-shell {
   padding-top: env(safe-area-inset-top, 0px);
   padding-left: env(safe-area-inset-left, 0px);
@@ -64,6 +78,28 @@ canvas {
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (max-width: 639px) {
+  h1,
+  h2,
+  h3,
+  p,
+  a,
+  button,
+  label,
+  span {
+    overflow-wrap: anywhere;
+  }
+
+  table {
+    font-size: 0.8125rem;
+  }
+
+  th,
+  td {
+    white-space: normal;
+  }
 }
 
 input::placeholder {

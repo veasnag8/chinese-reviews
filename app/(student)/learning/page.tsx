@@ -526,9 +526,9 @@ export default function LearningPage() {
           <div className="h-full bg-[#b91c1c]" style={{ width: `${((currentWordIndex) / words.length) * 100}%` }} />
         </div>
 
-        <section className="rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+        <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
           <p className="text-sm text-slate-500">Listen to the word</p>
-          <p className="mt-5 text-6xl font-semibold">{currentWord.chinese}</p>
+          <p className="mt-5 text-4xl font-semibold sm:text-6xl">{currentWord.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <span className="text-xl text-slate-500">{currentWord.pinyin}</span>
             <button
@@ -580,9 +580,9 @@ export default function LearningPage() {
           </span>
         </div>
 
-        <section className="rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+        <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
           <p className="text-sm text-slate-500">Write the character</p>
-          <p className="mt-5 text-6xl font-semibold">{currentWord.chinese}</p>
+          <p className="mt-5 text-4xl font-semibold sm:text-6xl">{currentWord.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <span className="text-xl text-slate-500">{currentWord.pinyin}</span>
             <button
@@ -645,7 +645,7 @@ export default function LearningPage() {
           {/* Current character display */}
           <div className="mt-4 text-center">
             <p className="text-sm text-slate-500">Current character:</p>
-            <p className="mt-1 text-5xl font-bold text-[#b91c1c] tracking-wide">{character}</p>
+            <p className="mt-1 text-4xl font-bold tracking-wide text-[#b91c1c] sm:text-5xl">{character}</p>
             <p className="text-sm text-slate-500">{currentWord.pinyin}</p>
           </div>
 
@@ -720,9 +720,9 @@ export default function LearningPage() {
           </span>
         </div>
 
-        <section className="rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+        <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
           <p className="text-sm text-slate-500">Say the word aloud</p>
-          <p className="mt-5 text-6xl font-semibold tracking-wide">{currentWord.chinese}</p>
+          <p className="mt-5 text-4xl font-semibold tracking-wide sm:text-6xl">{currentWord.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <span className="text-xl font-medium text-slate-600">{currentWord.pinyin}</span>
             <button
@@ -871,7 +871,7 @@ export default function LearningPage() {
           <div className="h-full bg-blue-600" style={{ width: `${((currentSentenceIndex) / sentences.length) * 100}%` }} />
         </div>
 
-        <section className="rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm">
+        <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
           <p className="text-sm text-slate-500">Listen to the sentence</p>
           <p className="mt-5 text-3xl font-semibold leading-relaxed">{currentSentence.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">

@@ -137,7 +137,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-md mx-auto">
-        <Card className="p-8">
+        <Card className="p-5 sm:p-8">
           {success && (
             <div className="mb-4 p-4 rounded-md bg-green-100 text-green-800">
               Profile updated successfully!

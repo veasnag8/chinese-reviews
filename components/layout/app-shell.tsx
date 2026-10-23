@@ -320,7 +320,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           key={href}
           href={href}
           onClick={() => setMobileMenuOpen(false)}
-          className={`flex min-w-14 flex-col items-center gap-1 rounded-lg px-2 py-1 text-[11px] ${pathname === href ? 'text-[#b91c1c]' : 'text-slate-500'}`}
+          className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-0.5 py-1 text-[10px] sm:px-2 sm:text-[11px] ${pathname === href ? 'text-[#b91c1c]' : 'text-slate-500'}`}
         >
           <Icon size={19} />
           <span>
@@ -331,7 +331,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       ))}
       <button
         onClick={() => setMobileMenuOpen(true)}
-        className="flex min-w-14 flex-col items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-slate-500 relative"
+        className="relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-0.5 py-1 text-[10px] text-slate-500 sm:px-2 sm:text-[11px]"
         aria-label="More options"
       >
         <Menu size={19} />

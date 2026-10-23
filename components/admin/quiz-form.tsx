@@ -541,7 +541,7 @@ export function QuizForm({ initial }: QuizFormProps) {
                 value={wordSearch}
                 onChange={(event) => setWordSearch(event.target.value)}
                 placeholder="Search words by Chinese, pinyin, meaning or class..."
-                className="flex-1 min-w-[200px] rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                className="w-full min-w-0 flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm sm:min-w-[200px]"
               />
               {filteredWords.length > 0 && (
                 <div className="flex items-center gap-2">
@@ -613,7 +613,7 @@ export function QuizForm({ initial }: QuizFormProps) {
                 value={sentenceSearch}
                 onChange={(event) => setSentenceSearch(event.target.value)}
                 placeholder="Search sentences by Chinese, pinyin, translation or class..."
-                className="flex-1 min-w-[200px] rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                className="w-full min-w-0 flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm sm:min-w-[200px]"
               />
               {filteredSentences.length > 0 && (
                 <div className="flex items-center gap-2">
