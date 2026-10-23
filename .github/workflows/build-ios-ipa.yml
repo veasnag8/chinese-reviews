@@ -11,6 +11,9 @@ on:
       - 'package-lock.json'
       - '.github/workflows/build-ios-ipa.yml'
 
+permissions:
+  contents: write
+
 jobs:
   build-ios:
     runs-on: macos-latest
@@ -53,3 +56,13 @@ jobs:
           name: Chinese-Review-iOS-unsigned
           path: build/Chinese-Review-iOS-unsigned.ipa
           if-no-files-found: error
+
+      - name: Publish unsigned IPA release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobile-latest
+          name: Chinese Review Mobile Build
+          body: Unsigned iOS IPA for external signing and sideloading.
+          prerelease: true
+          make_latest: false
+          files: build/Chinese-Review-iOS-unsigned.ipa
