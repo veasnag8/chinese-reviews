@@ -7,3 +7,11 @@ build_output*.txt
 .env*.local
 .env.production
 
+# Native build outputs and local SDK paths
+android/.gradle/
+android/app/build/
+android/local.properties
+ios/App/Pods/
+ios/App/DerivedData/
+releases/
+
