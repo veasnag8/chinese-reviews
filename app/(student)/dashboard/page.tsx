@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowRight, BookOpen, CheckCircle2, Flame, Gamepad2, GraduationCap, Repeat2, Trophy } from 'lucide-react';
+import { ArrowRight, BookOpen, CheckCircle2, Flame, Gamepad2, GraduationCap, Repeat2, Sparkles, Trophy } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const stat = (label: string, value: string, icon: React.ReactNode, tone: string) => (
@@ -272,6 +272,17 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+      <Link href="/ai-tutor" className="group flex flex-col gap-4 rounded-3xl border border-red-100 bg-white p-5 shadow-sm transition hover:border-red-200 hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex items-center gap-4">
+          <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-red-50 text-[#b91c1c]"><Sparkles size={24} /></div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b91c1c]">AI language tutor</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">រៀនភាសាជាមួយគ្រូ AI ផ្ទាល់ខ្លួន</h2>
+            <p className="mt-1 text-sm text-slate-500">ជ្រើសរើសភាសា កម្រិត និងគោលដៅ ដើម្បីទទួលបានមេរៀនសមស្រប។</p>
+          </div>
+        </div>
+        <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 text-sm font-semibold text-white group-hover:bg-[#991b1b]">ចាប់ផ្ដើម <ArrowRight size={17} /></span>
+      </Link>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stat('Words learned', String(stats.wordsCount), <BookOpen size={18} />, 'bg-red-50 text-[#b91c1c]')}
         {stat('Sentences learned', String(stats.sentencesCount), <GraduationCap size={18} />, 'bg-blue-50 text-blue-700')}

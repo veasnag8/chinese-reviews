@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
     userExists = !!profile;
   }
 
-  const protectedPaths = ['/dashboard', '/learning', '/words', '/sentences', '/conversations', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes', '/for-you', '/scramble', '/admin'];
+  const protectedPaths = ['/dashboard', '/ai-tutor', '/api/ai/tutor', '/learning', '/words', '/sentences', '/conversations', '/daily', '/classes', '/favorites', '/progress', '/settings', '/writing', '/review', '/quizzes', '/for-you', '/scramble', '/admin'];
   const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path));
   
   // Allow login and register pages without auth
@@ -63,6 +63,10 @@ export async function middleware(request: NextRequest) {
     // Clear auth cookies if user doesn't exist in database
     if (user && !userExists) {
       await supabase.auth.signOut();
+    }
+
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
     
     const url = request.nextUrl.clone();

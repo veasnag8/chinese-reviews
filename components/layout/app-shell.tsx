@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, Brain, CalendarDays, ChartNoAxesColumnIncreasing, ChevronDown, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, MessageCircle, NotebookPen, PenLine, Settings, ShieldCheck, TextQuote, Users, X } from 'lucide-react';
+import { BookOpen, Brain, CalendarDays, ChartNoAxesColumnIncreasing, ChevronDown, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, MessageCircle, NotebookPen, PenLine, Settings, ShieldCheck, Sparkles, TextQuote, Users, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const navigation = [
   { href: '/dashboard', label: 'Dashboard', icon: House, admin: false },
+  { href: '/ai-tutor', label: 'AI Tutor', icon: Sparkles, admin: false },
   { href: '/learning', label: 'Learn', icon: Brain, admin: false },
   { href: '/daily', label: 'Daily', icon: CalendarDays, admin: false },
   { href: '/words', label: 'My Words', icon: BookOpen, admin: false },
@@ -58,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const overflowItems = [
+    { href: '/ai-tutor', label: 'AI Tutor', icon: Sparkles, admin: false },
     { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
     { href: '/for-you', label: 'Homework', icon: NotebookPen, admin: false },
     { href: '/conversations', label: 'Conversation', icon: MessageCircle, admin: false },
@@ -311,7 +313,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>}
       </nav>
     </aside>
-    <main className="min-w-0 overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto min-w-0 max-w-7xl px-4 py-4 sm:p-6 md:p-8">{children}</div></main>
+    <main className="min-w-0 overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><Link href="/ai-tutor" aria-label="Open AI Tutor" title="AI Tutor" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-50 px-3 text-sm font-semibold text-[#b91c1c] transition hover:bg-red-100"><Sparkles size={17} /> AI Tutor</Link><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto min-w-0 max-w-7xl px-4 py-4 sm:p-6 md:p-8">{children}</div></main>
     
     {/* Mobile bottom nav - 5 main items + menu */}
     <nav className="mobile-safe-nav fixed inset-x-0 bottom-0 z-10 flex items-center justify-between border-t border-stone-200 bg-white px-1 pt-2 md:hidden">
