@@ -278,7 +278,7 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b91c1c]">AI language tutor</p>
             <h2 className="mt-1 text-lg font-bold text-slate-900">រៀនភាសាជាមួយគ្រូ AI ផ្ទាល់ខ្លួន</h2>
-            <p className="mt-1 text-sm text-slate-500">ជ្រើសរើសភាសា កម្រិត និងគោលដៅ ដើម្បីទទួលបានមេរៀនសមស្រប។</p>
+            <p className="mt-1 text-sm text-slate-500">ជ្រើសរើសភាសា និងគោលដៅ ដើម្បីចាប់ផ្ដើមហាត់និយាយផ្ទាល់ជាមួយ AI។</p>
           </div>
         </div>
         <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 text-sm font-semibold text-white group-hover:bg-[#991b1b]">ចាប់ផ្ដើម <ArrowRight size={17} /></span>

@@ -1,19 +1,21 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { GoogleGenAI } from '@google/genai';
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   Check,
   ChevronLeft,
   LoaderCircle,
-  MessageCircle,
-  Send,
+  Mic,
+  MicOff,
+  PhoneOff,
   Sparkles,
-  Target,
+  Volume2,
 } from 'lucide-react';
+import type { LiveConnectConfig, Session } from '@google/genai';
 import { supabase } from '@/lib/supabase';
 
 const languageOptions = ['Chinese', 'English', 'Khmer', 'Korean', 'French'] as const;
@@ -40,18 +42,51 @@ type LearningProfile = {
   reason: (typeof reasonOptions)[number];
   goal: (typeof goalOptions)[number];
 };
-type Lesson = {
-  title: string;
-  explanation: string;
-  vocabulary: Array<{ target: string; pronunciation: string; khmerMeaning: string }>;
-  exampleTarget: string;
-  examplePronunciation: string;
-  exampleKhmer: string;
-  challenge: string;
-  goalTip: string;
-};
 type ChatMessage = { role: 'user' | 'assistant'; text: string };
-type SavedTutor = { profile: LearningProfile; lesson: Lesson };
+type VoiceStatus = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isOneOf<T extends readonly string[]>(value: unknown, values: T): value is T[number] {
+  return typeof value === 'string' && values.some((item) => item === value);
+}
+
+function isLearningProfile(value: unknown): value is LearningProfile {
+  if (!isRecord(value)) return false;
+  return isOneOf(value.language, languageOptions) &&
+    isOneOf(value.level, levelOptions) &&
+    isOneOf(value.reason, reasonOptions) &&
+    isOneOf(value.goal, goalOptions);
+}
+
+function encodeAudioForGemini(samples: Float32Array, sampleRate: number) {
+  const ratio = sampleRate / 16_000;
+  const outputLength = Math.floor(samples.length / ratio);
+  const pcm = new Int16Array(outputLength);
+  for (let index = 0; index < outputLength; index += 1) {
+    const position = index * ratio;
+    const leftIndex = Math.floor(position);
+    const rightIndex = Math.min(leftIndex + 1, samples.length - 1);
+    const fraction = position - leftIndex;
+    const sample = Math.max(-1, Math.min(1, samples[leftIndex] * (1 - fraction) + samples[rightIndex] * fraction));
+    pcm[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  const bytes = new Uint8Array(pcm.buffer);
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+  }
+  return btoa(binary);
+}
+
+function decodePcmAudio(data: string) {
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Int16Array(bytes.buffer);
+}
 
 const khmerLanguage: Record<(typeof languageOptions)[number], string> = {
   Chinese: 'ភាសាចិន',
@@ -93,12 +128,20 @@ export default function AiTutorPage() {
   const [loadingSaved, setLoadingSaved] = useState(true);
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState<Partial<LearningProfile>>({});
-  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [interimTranscript, setInterimTranscript] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sessionRef = useRef<Session | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const microphoneSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const microphoneProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const playbackSourcesRef = useRef(new Set<AudioBufferSourceNode>());
+  const nextPlaybackTimeRef = useRef(0);
+  const assistantTurnCompleteRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -111,10 +154,14 @@ export default function AiTutorPage() {
       }
       const raw = window.localStorage.getItem(key);
       if (raw) {
-        const saved = JSON.parse(raw) as SavedTutor;
-        if (saved.profile && saved.lesson && active) {
-          setProfile(saved.profile);
-          setLesson(saved.lesson);
+        const saved: unknown = JSON.parse(raw);
+        const savedProfile = isLearningProfile(saved)
+          ? saved
+          : isRecord(saved) && isLearningProfile(saved.profile)
+            ? saved.profile
+            : null;
+        if (savedProfile && active) {
+          setProfile(savedProfile);
         }
       }
       if (active) setStorageKey(key);
@@ -134,7 +181,38 @@ export default function AiTutorPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, loading]);
+  }, [messages, loading, interimTranscript]);
+
+  const closeVoiceSession = useCallback((updateUi = true) => {
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    try {
+      session?.close();
+    } catch (cause) {
+      console.error('Could not close Gemini Live session:', cause);
+    }
+    microphoneProcessorRef.current?.disconnect();
+    microphoneProcessorRef.current = null;
+    microphoneSourceRef.current?.disconnect();
+    microphoneSourceRef.current = null;
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    playbackSourcesRef.current.forEach((source) => source.stop());
+    playbackSourcesRef.current.clear();
+    const audioContext = audioContextRef.current;
+    audioContextRef.current = null;
+    if (audioContext && audioContext.state !== 'closed') {
+      void audioContext.close().catch((cause: unknown) => console.error('Could not close voice audio context:', cause));
+    }
+    nextPlaybackTimeRef.current = 0;
+    assistantTurnCompleteRef.current = false;
+    if (updateUi) {
+      setInterimTranscript('');
+      setVoiceStatus('idle');
+    }
+  }, []);
+
+  useEffect(() => () => closeVoiceSession(false), [closeVoiceSession]);
 
   const languageName = profile.language ? khmerLanguage[profile.language] : '';
   const question = questions[step].title.replaceAll('{language}', profile.language || 'this language');
@@ -142,70 +220,188 @@ export default function AiTutorPage() {
   const options = [languageOptions, levelOptions, reasonOptions, goalOptions][step];
   const canContinue = Boolean(selected);
 
+  const finishSetup = () => {
+    if (!isLearningProfile(profile)) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(profile));
+      setError('');
+      setMessages([]);
+    } catch (cause) {
+      console.error('Could not save tutor preferences:', cause);
+      setError('រក្សាទុកជម្រើសមិនបានទេ។ សូមពិនិត្យទំហំផ្ទុករបស់ browser ហើយសាកល្បងម្ដងទៀត។');
+    }
+  };
+
   const choose = (value: string) => {
-    if (step === 0) setProfile((current) => ({ ...current, language: value as LearningProfile['language'] }));
+    if (step === 0) setProfile({ language: value as LearningProfile['language'] });
     if (step === 1) setProfile((current) => ({ ...current, level: value as LearningProfile['level'] }));
     if (step === 2) setProfile((current) => ({ ...current, reason: value as LearningProfile['reason'] }));
     if (step === 3) setProfile((current) => ({ ...current, goal: value as LearningProfile['goal'] }));
   };
 
-  const createLesson = async () => {
-    if (!profile.language || !profile.level || !profile.reason || !profile.goal) return;
-    setLoading(true);
-    setError('');
-    try {
-      const response = await fetch('/api/ai/tutor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'lesson', profile }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'មិនអាចបង្កើតមេរៀនបានទេ។ សូមសាកល្បងម្ដងទៀត។');
-      const saved: SavedTutor = { profile: profile as LearningProfile, lesson: result.lesson as Lesson };
-      window.localStorage.setItem(storageKey, JSON.stringify(saved));
-      setLesson(saved.lesson);
-      setMessages([]);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'មានបញ្ហាក្នុងការភ្ជាប់ទៅ AI។ សូមសាកល្បងម្ដងទៀត។');
-    } finally {
-      setLoading(false);
+  const startVoiceSession = async () => {
+    if (!isLearningProfile(profile) || loading || voiceStatus !== 'idle') return;
+    const learningProfile = profile;
+    if (!navigator.mediaDevices?.getUserMedia || typeof AudioContext === 'undefined') {
+      setError('កម្មវិធីរុករកនេះមិនគាំទ្រមីក្រូហ្វូនទេ។ សូមបើកគេហទំព័រដោយប្រើ Chrome ឬ Safari។');
+      return;
     }
-  };
 
-  const submitAnswer = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const text = draft.trim();
-    if (!lesson || !text || loading) return;
-    const nextMessages = [...messages, { role: 'user' as const, text }];
-    setMessages(nextMessages);
-    setDraft('');
     setLoading(true);
+    setVoiceStatus('connecting');
     setError('');
     try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      mediaStreamRef.current = stream;
+      const audioContext = new AudioContext();
+      audioContextRef.current = audioContext;
+      await audioContext.resume();
+
       const response = await fetch('/api/ai/tutor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'reply',
-          profile,
-          lesson,
-          messages: nextMessages.slice(-10),
-        }),
+        body: JSON.stringify({ action: 'live-token', profile: learningProfile }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'AI មិនអាចឆ្លើយតបបានទេ។ សូមសាកល្បងម្ដងទៀត។');
-      setMessages((current) => [...current, { role: 'assistant', text: result.reply }]);
+      const result = await response.json() as {
+        token?: string;
+        model?: string;
+        config?: LiveConnectConfig;
+        error?: string;
+      };
+      if (!response.ok || !result.token || !result.model || !result.config) {
+        throw new Error(result.error || 'មិនអាចភ្ជាប់ទៅ AI បានទេ។ សូមពិនិត្យការកំណត់ Gemini API ហើយសាកល្បងម្ដងទៀត។');
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: result.token,
+        httpOptions: { apiVersion: 'v1alpha' },
+      });
+      const session = await ai.live.connect({
+        model: result.model,
+        config: result.config,
+        callbacks: {
+          onmessage: (message) => {
+            const content = message.serverContent;
+            if (!content) return;
+
+            if (content.interrupted) {
+              playbackSourcesRef.current.forEach((source) => source.stop());
+              playbackSourcesRef.current.clear();
+              nextPlaybackTimeRef.current = 0;
+              assistantTurnCompleteRef.current = false;
+              setVoiceStatus('listening');
+            }
+
+            const inputText = content.inputTranscription?.text?.trim();
+            if (inputText) {
+              setMessages((current) => [...current, { role: 'user', text: inputText }]);
+              setInterimTranscript('');
+              setVoiceStatus('thinking');
+            } else if (content.interimInputTranscription?.text) {
+              setInterimTranscript(content.interimInputTranscription.text);
+              setVoiceStatus('listening');
+            }
+
+            const outputText = content.outputTranscription?.text?.trim();
+            if (outputText) {
+              setMessages((current) => [...current, { role: 'assistant', text: outputText }]);
+            }
+
+            for (const part of content.modelTurn?.parts || []) {
+              const audio = part.inlineData;
+              if (!audio?.data || !audio.mimeType?.startsWith('audio/pcm')) continue;
+              try {
+                const pcm = decodePcmAudio(audio.data);
+                const outputContext = audioContextRef.current;
+                if (!outputContext || outputContext.state === 'closed') continue;
+                const buffer = outputContext.createBuffer(1, pcm.length, 24_000);
+                const channel = buffer.getChannelData(0);
+                for (let index = 0; index < pcm.length; index += 1) channel[index] = pcm[index] / 32_768;
+                const source = outputContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(outputContext.destination);
+                const startAt = Math.max(outputContext.currentTime + 0.02, nextPlaybackTimeRef.current);
+                nextPlaybackTimeRef.current = startAt + buffer.duration;
+                playbackSourcesRef.current.add(source);
+                assistantTurnCompleteRef.current = false;
+                source.onended = () => {
+                  playbackSourcesRef.current.delete(source);
+                  if (assistantTurnCompleteRef.current && playbackSourcesRef.current.size === 0) setVoiceStatus('listening');
+                };
+                source.start(startAt);
+                setVoiceStatus('speaking');
+              } catch (cause) {
+                console.error('Could not play Gemini voice audio:', cause);
+                setError('មិនអាចចាក់សំឡេង AI បានទេ។ សូមពិនិត្យសំឡេងឧបករណ៍របស់អ្នក។');
+              }
+            }
+
+            if (content.turnComplete) {
+              assistantTurnCompleteRef.current = true;
+              if (playbackSourcesRef.current.size === 0) setVoiceStatus('listening');
+            }
+          },
+          onerror: (event) => {
+            setError(event.message || 'ការតភ្ជាប់សំឡេងត្រូវបានរំខាន។ សូមចាប់ផ្ដើមម្ដងទៀត។');
+            closeVoiceSession();
+          },
+          onclose: () => {
+            if (sessionRef.current) closeVoiceSession();
+          },
+        },
+      });
+      sessionRef.current = session;
+      setMessages([]);
+
+      const microphoneSource = audioContext.createMediaStreamSource(stream);
+      const microphoneProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+      microphoneProcessor.onaudioprocess = (event) => {
+        event.outputBuffer.getChannelData(0).fill(0);
+        if (!sessionRef.current) return;
+        const samples = event.inputBuffer.getChannelData(0);
+        try {
+          sessionRef.current.sendRealtimeInput({
+            audio: {
+              data: encodeAudioForGemini(samples, audioContext.sampleRate),
+              mimeType: 'audio/pcm;rate=16000',
+            },
+          });
+        } catch (cause) {
+          console.error('Could not send microphone audio to Gemini:', cause);
+          setError('មិនអាចផ្ញើសំឡេងទៅ AI បានទេ។ សូមចាប់ផ្ដើមម្ដងទៀត។');
+          closeVoiceSession();
+        }
+      };
+      microphoneSource.connect(microphoneProcessor);
+      microphoneProcessor.connect(audioContext.destination);
+      microphoneSourceRef.current = microphoneSource;
+      microphoneProcessorRef.current = microphoneProcessor;
+
+      setVoiceStatus('listening');
+      session.sendClientContent({
+        turns: [{
+          role: 'user',
+          parts: [{ text: 'Start the live speaking practice now. Greet me briefly in Khmer, introduce one useful phrase in the target language, then ask me one simple question in that language and wait for my spoken reply.' }],
+        }],
+        turnComplete: true,
+      });
     } catch (cause) {
-      setMessages((current) => current.filter((message, index) => !(message.role === 'user' && index === current.length - 1)));
-      setDraft(text);
-      setError(cause instanceof Error ? cause.message : 'មានបញ្ហាក្នុងការភ្ជាប់ទៅ AI។ សូមសាកល្បងម្ដងទៀត។');
+      closeVoiceSession();
+      const message = typeof DOMException !== 'undefined' && cause instanceof DOMException && cause.name === 'NotAllowedError'
+        ? 'សូមអនុញ្ញាតឱ្យប្រើមីក្រូហ្វូន ដើម្បីចាប់ផ្ដើមនិយាយជាមួយ AI។'
+        : cause instanceof Error
+          ? cause.message
+          : 'មិនអាចភ្ជាប់សំឡេងទៅ AI បានទេ។ សូមពិនិត្យសិទ្ធិមីក្រូហ្វូន ហើយសាកល្បងម្ដងទៀត។';
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
   const startOver = () => {
-    setLesson(null);
+    closeVoiceSession();
     setMessages([]);
     setStep(0);
     setProfile({});
@@ -223,13 +419,13 @@ export default function AiTutorPage() {
         <ArrowLeft size={17} /> ត្រឡប់ទៅទំព័រដើម
       </Link>
 
-      {!lesson ? (
+      {!isLearningProfile(profile) ? (
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="bg-gradient-to-br from-[#8f1717] to-[#c2413b] px-6 py-7 text-white sm:px-9 sm:py-9">
             <div className="mb-5 grid size-12 place-items-center rounded-2xl bg-white/15"><Sparkles size={25} /></div>
             <p className="text-sm font-semibold text-white/75">គ្រូ AI ផ្ទាល់ខ្លួនរបស់អ្នក</p>
             <h1 className="mt-1 text-2xl font-bold sm:text-3xl">រៀនភាសាតាមរបៀបរបស់អ្នក</h1>
-            <p className="mt-2 max-w-xl text-sm leading-7 text-white/85">ឆ្លើយសំណួរខ្លីៗ ដើម្បីឱ្យ AI រៀបចំមេរៀនសមស្របនឹងគោលដៅ និងកម្រិតរបស់អ្នក។</p>
+            <p className="mt-2 max-w-xl text-sm leading-7 text-white/85">ជ្រើសភាសា កម្រិត និងគោលដៅរបស់អ្នក រួចនិយាយផ្ទាល់ជាមួយគ្រូ AI។</p>
           </div>
           <div className="px-5 py-6 sm:px-9 sm:py-8">
             <div className="mb-7 flex items-center gap-2" aria-label={`សំណួរទី ${step + 1} ក្នុង 4`}>
@@ -275,8 +471,8 @@ export default function AiTutorPage() {
                   Continue <ArrowRight size={18} />
                 </button>
               ) : (
-                <button type="button" disabled={!canContinue || loading} onClick={() => void createLesson()} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#b91c1c] px-6 font-semibold text-white hover:bg-[#991b1b] disabled:cursor-not-allowed disabled:opacity-50">
-                  {loading ? <><LoaderCircle size={18} className="animate-spin" /> AI កំពុងរៀបចំមេរៀន...</> : <>Continue <Sparkles size={17} /></>}
+                <button type="button" disabled={!canContinue} onClick={finishSetup} className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#b91c1c] px-6 font-semibold text-white hover:bg-[#991b1b] disabled:cursor-not-allowed disabled:opacity-50">
+                  Continue <ArrowRight size={18} />
                 </button>
               )}
             </div>
@@ -287,9 +483,9 @@ export default function AiTutorPage() {
           <section className="rounded-3xl bg-gradient-to-br from-[#8f1717] to-[#c2413b] p-6 text-white shadow-sm sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold"><Sparkles size={14} /> មេរៀនរៀបចំដោយ AI · {languageName}</span>
-                <h1 className="mt-4 text-2xl font-bold sm:text-3xl">{lesson.title}</h1>
-                <p className="mt-2 max-w-2xl leading-7 text-white/90">{lesson.explanation}</p>
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold"><Sparkles size={14} /> គ្រូ AI · {languageName}</span>
+                <h1 className="mt-4 text-2xl font-bold sm:text-3xl">ត្រៀមនិយាយភាសា{languageName}ហើយឬនៅ?</h1>
+                <p className="mt-2 max-w-2xl leading-7 text-white/90">ចុចប៊ូតុងមីក្រូហ្វូន ដើម្បីចាប់ផ្ដើមសន្ទនាផ្ទាល់។ AI នឹងស្ដាប់ការនិយាយរបស់អ្នក ហើយឆ្លើយតបជាសំឡេង ដោយពន្យល់ជាភាសាខ្មែរ។</p>
               </div>
               <button type="button" onClick={startOver} className="rounded-xl border border-white/30 px-3 py-2 text-sm font-medium text-white hover:bg-white/10">កែចំណូលចិត្ត</button>
             </div>
@@ -300,53 +496,72 @@ export default function AiTutorPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-            <div className="mb-5 flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-xl bg-red-50 text-[#b91c1c]"><BookOpen size={20} /></div>
-              <div><h2 className="font-bold">ពាក្យសំខាន់ៗ</h2><p className="text-xs text-slate-500">សូមអាន និងចងចាំពាក្យទាំងនេះ</p></div>
+          <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+            <div className="bg-gradient-to-br from-stone-900 to-stone-800 px-5 py-7 text-white sm:px-8 sm:py-9">
+              <div className="mx-auto max-w-xl text-center">
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85">
+                  <Sparkles size={14} /> AI LIVE SPEAKING · {languageName}
+                </span>
+                <h2 className="mt-4 text-xl font-bold sm:text-2xl">និយាយផ្ទាល់ជាមួយគ្រូ AI</h2>
+                <p className="mt-2 text-sm leading-6 text-white/70">និយាយជាភាសា{languageName}។ AI នឹងស្ដាប់ ឆ្លើយតបជាសំឡេង និងពន្យល់ជាភាសាខ្មែរ។</p>
+                <div className="my-7 flex justify-center">
+                  <div className={`grid size-28 place-items-center rounded-full border border-white/15 bg-white/10 transition-all ${voiceStatus === 'speaking' ? 'scale-110 shadow-[0_0_50px_rgba(248,113,113,0.5)]' : voiceStatus === 'listening' ? 'shadow-[0_0_35px_rgba(134,239,172,0.25)]' : ''}`}>
+                    {loading || voiceStatus === 'connecting' ? (
+                      <LoaderCircle size={38} className="animate-spin text-white" />
+                    ) : voiceStatus === 'listening' ? (
+                      <Mic size={38} className="animate-pulse text-emerald-300" />
+                    ) : voiceStatus === 'thinking' ? (
+                      <Sparkles size={38} className="animate-pulse text-amber-200" />
+                    ) : voiceStatus === 'speaking' ? (
+                      <Volume2 size={40} className="animate-pulse text-red-200" />
+                    ) : (
+                      <Mic size={38} className="text-white/80" />
+                    )}
+                  </div>
+                </div>
+                <p aria-live="polite" className="min-h-6 text-sm font-medium text-white/85">
+                  {loading || voiceStatus === 'connecting' ? 'កំពុងភ្ជាប់ទៅ AI...' :
+                    voiceStatus === 'listening' ? 'AI កំពុងស្ដាប់អ្នក... និយាយបានភ្លាមៗ' :
+                      voiceStatus === 'thinking' ? 'AI កំពុងយល់ចម្លើយរបស់អ្នក...' :
+                        voiceStatus === 'speaking' ? 'AI កំពុងនិយាយ...' :
+                          'ចុចប៊ូតុង រួចចាប់ផ្ដើមនិយាយ'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => voiceStatus === 'idle' ? void startVoiceSession() : closeVoiceSession()}
+                  disabled={loading && voiceStatus !== 'connecting'}
+                  aria-pressed={voiceStatus !== 'idle'}
+                  className={`mt-5 inline-flex min-h-14 items-center justify-center gap-3 rounded-full px-7 text-base font-bold shadow-lg transition active:scale-95 disabled:cursor-wait disabled:opacity-70 ${voiceStatus === 'idle' ? 'bg-[#c42b2b] text-white hover:bg-[#a91d1d]' : 'bg-white text-[#991b1b] hover:bg-red-50'}`}
+                >
+                  {loading || voiceStatus === 'connecting' ? <LoaderCircle size={20} className="animate-spin" /> :
+                    voiceStatus === 'idle' ? <Mic size={21} /> : <PhoneOff size={20} />}
+                  {loading || voiceStatus === 'connecting' ? 'កំពុងភ្ជាប់...' :
+                    voiceStatus === 'idle' ? 'ចាប់ផ្ដើមនិយាយ' : 'បញ្ចប់ការសន្ទនា'}
+                </button>
+                <p className="mt-4 text-xs text-white/50"><MicOff size={13} className="mr-1 inline" /> សំឡេងមីក្រូហ្វូនប្រើសម្រាប់សន្ទនានេះតែប៉ុណ្ណោះ។ AI អាចត្រូវការពេលខ្លីដើម្បីឆ្លើយតប។</p>
+              </div>
             </div>
-            <div className="divide-y divide-stone-100">
-              {lesson.vocabulary.map((word, index) => (
-                <div key={`${word.target}-${index}`} className="grid gap-1 py-4 sm:grid-cols-[1fr_1fr_1.2fr] sm:items-center sm:gap-4">
-                  <p className="font-semibold text-slate-900">{word.target}</p>
-                  <p className="text-sm text-slate-500">{word.pronunciation}</p>
-                  <p className="text-sm text-slate-700">{word.khmerMeaning}</p>
+            <div className="max-h-80 space-y-3 overflow-y-auto p-5 sm:p-7">
+              {messages.length === 0 && !interimTranscript && (
+                <p className="text-center text-sm text-slate-400">ការសន្ទនាជាសំឡេងនឹងបង្ហាញនៅទីនេះ។</p>
+              )}
+              {messages.map((message, index) => (
+                <div key={`${index}-${message.role}`} className={`max-w-[88%] whitespace-pre-wrap rounded-2xl p-4 text-sm leading-6 ${message.role === 'user' ? 'ml-auto rounded-tr-sm bg-red-50 text-slate-800' : 'rounded-tl-sm bg-stone-100 text-slate-700'}`}>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{message.role === 'user' ? 'អ្នក' : 'AI Tutor'}</p>
+                  {message.text}
                 </div>
               ))}
-            </div>
-          </section>
-
-          <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-7">
-            <div className="mb-4 flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-700"><Target size={20} /></div><h2 className="font-bold">ឧទាហរណ៍ និងលំហាត់</h2></div>
-            <p className="text-lg font-bold text-slate-900">{lesson.exampleTarget}</p>
-            <p className="mt-1 text-sm text-slate-500">{lesson.examplePronunciation}</p>
-            <p className="mt-2 text-sm text-slate-700">{lesson.exampleKhmer}</p>
-            <div className="mt-5 rounded-2xl bg-amber-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-amber-800">សាកល្បងឆ្លើយជាភាសា {languageName}</p>
-              <p className="mt-1 font-semibold text-amber-950">{lesson.challenge}</p>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-800">គន្លឹះ៖</span> {lesson.goalTip}</p>
-          </section>
-
-          <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-            <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-4 sm:px-7">
-              <div className="grid size-10 place-items-center rounded-xl bg-red-50 text-[#b91c1c]"><MessageCircle size={20} /></div>
-              <div><h2 className="font-bold">ហាត់ជាមួយគ្រូ AI</h2><p className="text-xs text-slate-500">ឆ្លើយជាភាសាដែលអ្នកកំពុងរៀន · គ្រូនឹងពន្យល់ជាភាសាខ្មែរ</p></div>
-            </div>
-            <div className="max-h-96 space-y-3 overflow-y-auto p-5 sm:p-7">
-              {messages.length === 0 && <div className="max-w-[88%] rounded-2xl rounded-tl-sm bg-stone-100 p-4 text-sm leading-6 text-slate-700">{lesson.challenge}</div>}
-              {messages.map((message, index) => (
-                <div key={`${index}-${message.role}`} className={`max-w-[88%] whitespace-pre-wrap rounded-2xl p-4 text-sm leading-6 ${message.role === 'user' ? 'ml-auto rounded-tr-sm bg-[#b91c1c] text-white' : 'rounded-tl-sm bg-stone-100 text-slate-700'}`}>{message.text}</div>
-              ))}
-              {loading && lesson && <div className="flex items-center gap-2 text-sm text-slate-500"><LoaderCircle size={16} className="animate-spin" /> AI កំពុងគិត...</div>}
+              {interimTranscript && (
+                <div className="ml-auto max-w-[88%] rounded-2xl rounded-tr-sm bg-red-50 p-4 text-sm italic leading-6 text-slate-500">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide">អ្នកកំពុងនិយាយ</p>{interimTranscript}
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
-            {error && <p role="alert" className="mx-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:mx-7">{error}</p>}
-            <form onSubmit={(event) => void submitAnswer(event)} className="flex gap-2 border-t border-stone-100 p-4 sm:p-5">
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={500} placeholder={`សរសេរចម្លើយជាភាសា ${languageName}...`} aria-label="សរសេរចម្លើយរបស់អ្នក" className="min-h-12 min-w-0 flex-1 rounded-xl border border-stone-200 px-4 text-sm outline-none focus:border-[#b91c1c] focus:ring-2 focus:ring-red-100" />
-              <button type="submit" disabled={!draft.trim() || loading} aria-label="ផ្ញើចម្លើយ" className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#b91c1c] text-white hover:bg-[#991b1b] disabled:cursor-not-allowed disabled:opacity-40"><Send size={18} /></button>
-            </form>
+            {error && <p role="alert" className="mx-5 mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:mx-7">{error}</p>}
           </section>
+
+          <p className="text-center text-xs text-slate-400">សូមអនុញ្ញាតឱ្យ browser ប្រើមីក្រូហ្វូន និងបើកសំឡេងនៅលើឧបករណ៍របស់អ្នក។</p>
           <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#b91c1c]"><ArrowLeft size={16} /> ត្រឡប់ទៅទំព័រដើម</Link>
         </>
       )}
