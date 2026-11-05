@@ -14,6 +14,7 @@ import {
   PhoneOff,
   Sparkles,
   Volume2,
+  VolumeX,
 } from 'lucide-react';
 import type { LiveConnectConfig, Session } from '@google/genai';
 import { supabase } from '@/lib/supabase';
@@ -132,11 +133,15 @@ export default function AiTutorPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [microphoneMuted, setMicrophoneMuted] = useState(false);
+  const [speakerEnabled, setSpeakerEnabled] = useState(true);
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [callDuration, setCallDuration] = useState(0);
   const [interimTranscript, setInterimTranscript] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<Session | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const outputGainRef = useRef<GainNode | null>(null);
   const microphoneSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const microphoneProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const playbackSourcesRef = useRef(new Set<AudioBufferSourceNode>());
@@ -180,8 +185,12 @@ export default function AiTutorPage() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, loading, interimTranscript]);
+    if (!callStartedAt || voiceStatus === 'idle') return;
+    const updateDuration = () => setCallDuration(Math.floor((Date.now() - callStartedAt) / 1000));
+    updateDuration();
+    const timer = window.setInterval(updateDuration, 1000);
+    return () => window.clearInterval(timer);
+  }, [callStartedAt, voiceStatus]);
 
   const closeVoiceSession = useCallback((updateUi = true) => {
     const session = sessionRef.current;
@@ -201,6 +210,7 @@ export default function AiTutorPage() {
     playbackSourcesRef.current.clear();
     const audioContext = audioContextRef.current;
     audioContextRef.current = null;
+    outputGainRef.current = null;
     if (audioContext && audioContext.state !== 'closed') {
       void audioContext.close().catch((cause: unknown) => console.error('Could not close voice audio context:', cause));
     }
@@ -209,6 +219,10 @@ export default function AiTutorPage() {
     if (updateUi) {
       setInterimTranscript('');
       setVoiceStatus('idle');
+      setMicrophoneMuted(false);
+      setSpeakerEnabled(true);
+      setCallStartedAt(null);
+      setCallDuration(0);
     }
   }, []);
 
@@ -257,6 +271,10 @@ export default function AiTutorPage() {
       mediaStreamRef.current = stream;
       const audioContext = new AudioContext();
       audioContextRef.current = audioContext;
+      const outputGain = audioContext.createGain();
+      outputGain.gain.value = speakerEnabled ? 1 : 0;
+      outputGain.connect(audioContext.destination);
+      outputGainRef.current = outputGain;
       await audioContext.resume();
 
       const response = await fetch('/api/ai/tutor', {
@@ -321,7 +339,7 @@ export default function AiTutorPage() {
                 for (let index = 0; index < pcm.length; index += 1) channel[index] = pcm[index] / 32_768;
                 const source = outputContext.createBufferSource();
                 source.buffer = buffer;
-                source.connect(outputContext.destination);
+                source.connect(outputGainRef.current || outputContext.destination);
                 const startAt = Math.max(outputContext.currentTime + 0.02, nextPlaybackTimeRef.current);
                 nextPlaybackTimeRef.current = startAt + buffer.duration;
                 playbackSourcesRef.current.add(source);
@@ -379,6 +397,9 @@ export default function AiTutorPage() {
       microphoneSourceRef.current = microphoneSource;
       microphoneProcessorRef.current = microphoneProcessor;
 
+      setCallStartedAt(Date.now());
+      setCallDuration(0);
+      setMicrophoneMuted(false);
       setVoiceStatus('listening');
       session.sendClientContent({
         turns: [{
@@ -409,17 +430,32 @@ export default function AiTutorPage() {
     window.localStorage.removeItem(storageKey);
   };
 
+  const toggleMicrophone = () => {
+    const nextMuted = !microphoneMuted;
+    mediaStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = !nextMuted;
+    });
+    setMicrophoneMuted(nextMuted);
+  };
+
+  const toggleSpeaker = () => {
+    const nextEnabled = !speakerEnabled;
+    if (outputGainRef.current) outputGainRef.current.gain.value = nextEnabled ? 1 : 0;
+    setSpeakerEnabled(nextEnabled);
+  };
+
+  const formattedDuration = `${String(Math.floor(callDuration / 60)).padStart(2, '0')}:${String(callDuration % 60).padStart(2, '0')}`;
+
   if (loadingSaved) {
     return <div className="grid min-h-[50vh] place-items-center text-slate-500"><LoaderCircle className="animate-spin" /> <span className="sr-only">កំពុងផ្ទុក...</span></div>;
   }
 
-  return (
+  return !isLearningProfile(profile) ? (
     <div className="mx-auto max-w-3xl space-y-6 pb-8">
       <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#b91c1c]">
         <ArrowLeft size={17} /> ត្រឡប់ទៅទំព័រដើម
       </Link>
 
-      {!isLearningProfile(profile) ? (
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="bg-gradient-to-br from-[#8f1717] to-[#c2413b] px-6 py-7 text-white sm:px-9 sm:py-9">
             <div className="mb-5 grid size-12 place-items-center rounded-2xl bg-white/15"><Sparkles size={25} /></div>
@@ -478,93 +514,119 @@ export default function AiTutorPage() {
             </div>
           </div>
         </section>
-      ) : (
-        <>
-          <section className="rounded-3xl bg-gradient-to-br from-[#8f1717] to-[#c2413b] p-6 text-white shadow-sm sm:p-8">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold"><Sparkles size={14} /> គ្រូ AI · {languageName}</span>
-                <h1 className="mt-4 text-2xl font-bold sm:text-3xl">ត្រៀមនិយាយភាសា{languageName}ហើយឬនៅ?</h1>
-                <p className="mt-2 max-w-2xl leading-7 text-white/90">ចុចប៊ូតុងមីក្រូហ្វូន ដើម្បីចាប់ផ្ដើមសន្ទនាផ្ទាល់។ AI នឹងស្ដាប់ការនិយាយរបស់អ្នក ហើយឆ្លើយតបជាសំឡេង ដោយពន្យល់ជាភាសាខ្មែរ។</p>
-              </div>
-              <button type="button" onClick={startOver} className="rounded-xl border border-white/30 px-3 py-2 text-sm font-medium text-white hover:bg-white/10">កែចំណូលចិត្ត</button>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2 text-xs text-white/85">
-              <span className="rounded-full bg-black/15 px-3 py-1.5">{profile.level}</span>
-              <span className="rounded-full bg-black/15 px-3 py-1.5">{profile.goal}</span>
-              <span className="rounded-full bg-black/15 px-3 py-1.5">{profile.reason}</span>
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
-            <div className="bg-gradient-to-br from-stone-900 to-stone-800 px-5 py-7 text-white sm:px-8 sm:py-9">
-              <div className="mx-auto max-w-xl text-center">
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85">
-                  <Sparkles size={14} /> AI LIVE SPEAKING · {languageName}
-                </span>
-                <h2 className="mt-4 text-xl font-bold sm:text-2xl">និយាយផ្ទាល់ជាមួយគ្រូ AI</h2>
-                <p className="mt-2 text-sm leading-6 text-white/70">និយាយជាភាសា{languageName}។ AI នឹងស្ដាប់ ឆ្លើយតបជាសំឡេង និងពន្យល់ជាភាសាខ្មែរ។</p>
-                <div className="my-7 flex justify-center">
-                  <div className={`grid size-28 place-items-center rounded-full border border-white/15 bg-white/10 transition-all ${voiceStatus === 'speaking' ? 'scale-110 shadow-[0_0_50px_rgba(248,113,113,0.5)]' : voiceStatus === 'listening' ? 'shadow-[0_0_35px_rgba(134,239,172,0.25)]' : ''}`}>
-                    {loading || voiceStatus === 'connecting' ? (
-                      <LoaderCircle size={38} className="animate-spin text-white" />
-                    ) : voiceStatus === 'listening' ? (
-                      <Mic size={38} className="animate-pulse text-emerald-300" />
-                    ) : voiceStatus === 'thinking' ? (
-                      <Sparkles size={38} className="animate-pulse text-amber-200" />
-                    ) : voiceStatus === 'speaking' ? (
-                      <Volume2 size={40} className="animate-pulse text-red-200" />
-                    ) : (
-                      <Mic size={38} className="text-white/80" />
-                    )}
-                  </div>
-                </div>
-                <p aria-live="polite" className="min-h-6 text-sm font-medium text-white/85">
-                  {loading || voiceStatus === 'connecting' ? 'កំពុងភ្ជាប់ទៅ AI...' :
-                    voiceStatus === 'listening' ? 'AI កំពុងស្ដាប់អ្នក... និយាយបានភ្លាមៗ' :
-                      voiceStatus === 'thinking' ? 'AI កំពុងយល់ចម្លើយរបស់អ្នក...' :
-                        voiceStatus === 'speaking' ? 'AI កំពុងនិយាយ...' :
-                          'ចុចប៊ូតុង រួចចាប់ផ្ដើមនិយាយ'}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => voiceStatus === 'idle' ? void startVoiceSession() : closeVoiceSession()}
-                  disabled={loading && voiceStatus !== 'connecting'}
-                  aria-pressed={voiceStatus !== 'idle'}
-                  className={`mt-5 inline-flex min-h-14 items-center justify-center gap-3 rounded-full px-7 text-base font-bold shadow-lg transition active:scale-95 disabled:cursor-wait disabled:opacity-70 ${voiceStatus === 'idle' ? 'bg-[#c42b2b] text-white hover:bg-[#a91d1d]' : 'bg-white text-[#991b1b] hover:bg-red-50'}`}
-                >
-                  {loading || voiceStatus === 'connecting' ? <LoaderCircle size={20} className="animate-spin" /> :
-                    voiceStatus === 'idle' ? <Mic size={21} /> : <PhoneOff size={20} />}
-                  {loading || voiceStatus === 'connecting' ? 'កំពុងភ្ជាប់...' :
-                    voiceStatus === 'idle' ? 'ចាប់ផ្ដើមនិយាយ' : 'បញ្ចប់ការសន្ទនា'}
-                </button>
-                <p className="mt-4 text-xs text-white/50"><MicOff size={13} className="mr-1 inline" /> សំឡេងមីក្រូហ្វូនប្រើសម្រាប់សន្ទនានេះតែប៉ុណ្ណោះ។ AI អាចត្រូវការពេលខ្លីដើម្បីឆ្លើយតប។</p>
-              </div>
-            </div>
-            <div className="max-h-80 space-y-3 overflow-y-auto p-5 sm:p-7">
-              {messages.length === 0 && !interimTranscript && (
-                <p className="text-center text-sm text-slate-400">ការសន្ទនាជាសំឡេងនឹងបង្ហាញនៅទីនេះ។</p>
-              )}
-              {messages.map((message, index) => (
-                <div key={`${index}-${message.role}`} className={`max-w-[88%] whitespace-pre-wrap rounded-2xl p-4 text-sm leading-6 ${message.role === 'user' ? 'ml-auto rounded-tr-sm bg-red-50 text-slate-800' : 'rounded-tl-sm bg-stone-100 text-slate-700'}`}>
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{message.role === 'user' ? 'អ្នក' : 'AI Tutor'}</p>
-                  {message.text}
-                </div>
-              ))}
-              {interimTranscript && (
-                <div className="ml-auto max-w-[88%] rounded-2xl rounded-tr-sm bg-red-50 p-4 text-sm italic leading-6 text-slate-500">
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wide">អ្នកកំពុងនិយាយ</p>{interimTranscript}
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-            {error && <p role="alert" className="mx-5 mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:mx-7">{error}</p>}
-          </section>
-
-          <p className="text-center text-xs text-slate-400">សូមអនុញ្ញាតឱ្យ browser ប្រើមីក្រូហ្វូន និងបើកសំឡេងនៅលើឧបករណ៍របស់អ្នក។</p>
-          <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#b91c1c]"><ArrowLeft size={16} /> ត្រឡប់ទៅទំព័រដើម</Link>
-        </>
-      )}
     </div>
+  ) : (
+    <section className="fixed inset-0 z-[60] flex min-h-0 flex-col overflow-y-auto bg-[radial-gradient(ellipse_at_50%_39%,#fff_0%,#faf9f7_47%,#f0efed_100%)] px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))] sm:px-8">
+      <header className="flex w-full items-center justify-between">
+        <button type="button" onClick={startOver} aria-label="កែចំណូលចិត្ត" className="grid size-11 place-items-center rounded-full text-slate-500 transition hover:bg-stone-200/70 hover:text-slate-900">
+          <ArrowLeft size={20} />
+        </button>
+        <div className="text-center">
+          <p className="text-sm font-bold text-slate-800">AI Language Tutor</p>
+          <p className="mt-0.5 text-xs text-slate-500">{languageName} · ពន្យល់ជាភាសាខ្មែរ</p>
+        </div>
+        <div className="min-w-11 text-right text-xs font-medium tabular-nums text-slate-500" aria-label="រយៈពេលហៅ">
+          {voiceStatus === 'idle' ? 'ត្រៀមរួច' : formattedDuration}
+        </div>
+      </header>
+
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center py-8 text-center">
+        <div className="mb-2 flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/75 px-3.5 py-2 shadow-sm">
+          <span className={`size-2 rounded-full ${voiceStatus === 'idle' ? 'bg-stone-300' : voiceStatus === 'connecting' || voiceStatus === 'thinking' ? 'animate-pulse bg-amber-400' : 'bg-emerald-500'}`} />
+          <span className="text-xs font-medium text-slate-600">
+            {voiceStatus === 'connecting' || loading ? 'កំពុងភ្ជាប់...' :
+              voiceStatus === 'thinking' ? 'AI កំពុងគិត' :
+                voiceStatus === 'speaking' ? 'AI កំពុងនិយាយ' :
+                  voiceStatus === 'listening' && microphoneMuted ? 'បានបិទមីក្រូហ្វូន' :
+                    voiceStatus === 'listening' ? 'AI កំពុងស្ដាប់អ្នក' :
+                      'ត្រៀមចាប់ផ្ដើមការហៅ'}
+          </span>
+        </div>
+
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">គ្រូ AI {languageName}</h1>
+        <p className="mt-2 text-sm text-slate-500">{voiceStatus === 'idle' ? 'ហាត់និយាយផ្ទាល់ជាមួយ AI' : 'និយាយបានដោយសេរី · AI នឹងពន្យល់ជាភាសាខ្មែរ'}</p>
+
+        <div
+          className={`voice-orb my-12 grid size-40 place-items-center sm:size-48 ${voiceStatus === 'speaking' ? 'scale-105' : ''}`}
+          data-active={voiceStatus !== 'idle' && voiceStatus !== 'connecting'}
+          data-speaking={voiceStatus === 'speaking'}
+          aria-label={voiceStatus === 'speaking' ? 'AI កំពុងនិយាយ' : voiceStatus === 'listening' ? 'AI កំពុងស្ដាប់' : 'រូបតំណាងគ្រូ AI'}
+        >
+          <div className="grid size-28 place-items-center rounded-full border border-white/45 bg-white/15 shadow-[inset_0_1px_16px_rgba(255,255,255,0.4)] backdrop-blur-[2px] sm:size-32">
+            {loading || voiceStatus === 'connecting' ? <LoaderCircle className="animate-spin text-white" size={38} /> :
+              voiceStatus === 'listening' && microphoneMuted ? <MicOff className="text-white drop-shadow-sm" size={36} /> :
+                voiceStatus === 'listening' ? <Mic className="animate-pulse text-white drop-shadow-sm" size={36} /> :
+                  voiceStatus === 'thinking' ? <Sparkles className="animate-pulse text-white drop-shadow-sm" size={38} /> :
+                    voiceStatus === 'speaking' ? <Volume2 className="animate-pulse text-white drop-shadow-sm" size={40} /> :
+                      <Sparkles className="text-white drop-shadow-sm" size={38} />}
+          </div>
+        </div>
+
+        <div aria-live="polite" className="min-h-14 max-w-lg px-4">
+          {interimTranscript ? (
+            <p className="text-sm italic leading-6 text-slate-500">{interimTranscript}</p>
+          ) : messages.length > 0 ? (
+            <p className="text-sm leading-6 text-slate-600">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{messages[messages.length - 1].role === 'user' ? 'អ្នក' : 'AI Tutor'}</span>
+              {messages[messages.length - 1].text}
+            </p>
+          ) : (
+            <p className="text-sm leading-6 text-slate-400">ជ្រើសប៊ូតុងខាងក្រោម រួចចាប់ផ្ដើមនិយាយ</p>
+          )}
+        </div>
+      </div>
+
+      {error && <p role="alert" className="mx-auto mb-4 w-full max-w-md rounded-xl border border-red-200 bg-red-50 p-3 text-center text-sm text-red-700">{error}</p>}
+
+      <footer className="mx-auto w-full max-w-md pb-2">
+        <div className="flex items-start justify-center gap-5 sm:gap-8" role="group" aria-label="ប៊ូតុងគ្រប់គ្រងការហៅ">
+          <div className="flex w-20 flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => voiceStatus === 'idle' ? void startVoiceSession() : toggleMicrophone()}
+              disabled={loading}
+              aria-label={voiceStatus === 'idle' ? 'ចាប់ផ្ដើមនិយាយ' : microphoneMuted ? 'បើកមីក្រូហ្វូន' : 'បិទមីក្រូហ្វូន'}
+              aria-pressed={voiceStatus !== 'idle' && !microphoneMuted}
+              className={`grid size-16 place-items-center rounded-full shadow-sm transition active:scale-95 disabled:cursor-wait disabled:opacity-60 ${voiceStatus !== 'idle' && !microphoneMuted ? 'bg-white text-slate-700 ring-1 ring-stone-200 hover:bg-stone-50' : 'bg-slate-900 text-white hover:bg-slate-700'}`}
+            >
+              {loading ? <LoaderCircle className="animate-spin" size={23} /> :
+                voiceStatus === 'idle' ? <Mic size={23} /> :
+                  microphoneMuted ? <MicOff size={23} /> : <Mic size={23} />}
+            </button>
+            <span className="text-center text-[11px] font-medium text-slate-500">
+              {voiceStatus === 'idle' ? 'ចាប់ផ្ដើម' : microphoneMuted ? 'បើកមីក្រូ' : 'បិទមីក្រូ'}
+            </span>
+          </div>
+
+          <div className="flex w-20 flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleSpeaker}
+              disabled={voiceStatus === 'idle'}
+              aria-label={speakerEnabled ? 'បិទសំឡេង AI' : 'បើកសំឡេង AI'}
+              aria-pressed={speakerEnabled}
+              className={`grid size-16 place-items-center rounded-full shadow-sm transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${speakerEnabled && voiceStatus !== 'idle' ? 'bg-white text-slate-700 ring-1 ring-stone-200 hover:bg-stone-50' : 'bg-slate-900 text-white hover:bg-slate-700'}`}
+            >
+              {speakerEnabled ? <Volume2 size={23} /> : <VolumeX size={23} />}
+            </button>
+            <span className="text-center text-[11px] font-medium text-slate-500">{speakerEnabled ? 'សំឡេង' : 'បើកសំឡេង'}</span>
+          </div>
+
+          <div className="flex w-20 flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => closeVoiceSession()}
+              disabled={voiceStatus === 'idle'}
+              aria-label="បញ្ចប់ការហៅ"
+              className="grid size-16 place-items-center rounded-full bg-[#e5484d] text-white shadow-md shadow-red-200/70 transition hover:bg-[#d7373d] active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:shadow-none"
+            >
+              <PhoneOff size={23} />
+            </button>
+            <span className="text-center text-[11px] font-medium text-slate-500">បញ្ចប់ការហៅ</span>
+          </div>
+        </div>
+        <p className="mt-5 text-center text-xs text-slate-400">សូមអនុញ្ញាតឱ្យ browser ប្រើមីក្រូហ្វូន</p>
+      </footer>
+    </section>
   );
 }
