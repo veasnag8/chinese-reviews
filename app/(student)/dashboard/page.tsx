@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowRight, BookOpen, CheckCircle2, Flame, Gamepad2, GraduationCap, Repeat2, Sparkles, Trophy } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useLanguage } from '@/lib/i18n';
 
 const stat = (label: string, value: string, icon: React.ReactNode, tone: string) => (
   <div className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
@@ -55,6 +56,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const { t } = useLanguage();
   const [fullName, setFullName] = useState('');
   const [now, setNow] = useState<Date | null>(null);
   const [reviewCompletedToday, setReviewCompletedToday] = useState(false);
@@ -218,8 +220,18 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) {
-    return <div className="space-y-7">Loading...</div>;
+    return <div className="space-y-7">{t.dashboard.loading}</div>;
   }
+
+  const greetingText = now
+    ? (() => {
+        const hour = now.getHours();
+        if (hour >= 5 && hour < 12) return t.dashboard.goodMorning;
+        if (hour >= 12 && hour < 17) return t.dashboard.goodAfternoon;
+        if (hour >= 17 && hour < 21) return t.dashboard.goodEvening;
+        return t.dashboard.goodNight;
+      })()
+    : t.dashboard.welcome;
 
   return (
     <div className="min-w-0 space-y-5 sm:space-y-7">
@@ -229,16 +241,16 @@ export default function DashboardPage() {
             {now ? formatHeadlineDate(now) : '\u00a0'}
           </p>
           <h1 className="break-words text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
-            {now ? greetingForHour(now.getHours()) : 'Welcome'}
+            {greetingText}
             {fullName ? `, ${fullName}` : ''} 👋
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500 sm:text-base">A calm review today makes tomorrow easier.</p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500 sm:text-base">{t.dashboard.calmSubtitle}</p>
         </div>
         <Link
           href="/words?add=1"
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 py-3 text-sm font-semibold text-white sm:w-auto"
         >
-          Add what you learned <ArrowRight size={17} />
+          {t.dashboard.addWhatLearned} <ArrowRight size={17} />
         </Link>
       </section>
       <section className={`min-w-0 overflow-hidden rounded-3xl p-5 text-white sm:p-8 ${reviewCompletedToday ? 'bg-gradient-to-br from-emerald-800 to-teal-900' : 'bg-[#8f1717]'}`}>
@@ -248,26 +260,26 @@ export default function DashboardPage() {
               {reviewCompletedToday ? <CheckCircle2 /> : <Repeat2 />}
             </div>
             <p className="text-sm font-semibold tracking-wide text-white/80">
-              {reviewCompletedToday ? 'TODAY ALREADY REVIEWED' : "TODAY'S REVIEW"}
+              {reviewCompletedToday ? t.dashboard.todayAlreadyReviewed : t.dashboard.todaysReview}
             </p>
             <h2 className="mt-2 text-2xl font-bold leading-tight sm:text-3xl">
-              {reviewCompletedToday ? 'Review Completed Today' : `${stats.dueCount} items ready`}
+              {reviewCompletedToday ? t.dashboard.reviewCompletedToday : `${stats.dueCount} ${t.dashboard.itemsReady}`}
             </h2>
             <p className="mt-2 max-w-md text-white/80">
               {reviewCompletedToday
-                ? "You've already completed your daily review session for today. Great job keeping your streak alive! Can review tomorrow."
-                : 'Keep the words from your recent classes fresh with a short, focused session.'}
+                ? t.dashboard.reviewCompletedDesc
+                : t.dashboard.reviewPendingDesc}
             </p>
           </div>
           <div className="flex flex-col justify-end gap-4">
             <div className="flex items-center gap-2 text-amber-200">
-              <Flame fill="currentColor" /> <span className="font-semibold">7 day streak</span>
+              <Flame fill="currentColor" /> <span className="font-semibold">{t.dashboard.dayStreak}</span>
             </div>
             <Link
               href="/review"
               className={`inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold ${reviewCompletedToday ? 'text-emerald-800' : 'text-[#991b1b]'}`}
             >
-              {reviewCompletedToday ? 'View Review Words' : 'Start review'} <ArrowRight size={17} />
+              {reviewCompletedToday ? t.dashboard.viewReviewWords : t.dashboard.startReview} <ArrowRight size={17} />
             </Link>
           </div>
         </div>
@@ -276,18 +288,18 @@ export default function DashboardPage() {
         <div className="flex items-center gap-4">
           <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-red-50 text-[#b91c1c]"><Sparkles size={24} /></div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b91c1c]">AI language tutor</p>
-            <h2 className="mt-1 text-lg font-bold text-slate-900">រៀនភាសាជាមួយគ្រូ AI ផ្ទាល់ខ្លួន</h2>
-            <p className="mt-1 text-sm text-slate-500">ជ្រើសរើសភាសា និងគោលដៅ ដើម្បីចាប់ផ្ដើមហាត់និយាយផ្ទាល់ជាមួយ AI។</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b91c1c]">{t.dashboard.aiTutorEyebrow}</p>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">{t.dashboard.aiTutorTitle}</h2>
+            <p className="mt-1 text-sm text-slate-500">{t.dashboard.aiTutorDesc}</p>
           </div>
         </div>
-        <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 text-sm font-semibold text-white group-hover:bg-[#991b1b]">ចាប់ផ្ដើម <ArrowRight size={17} /></span>
+        <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-4 text-sm font-semibold text-white group-hover:bg-[#991b1b]">{t.dashboard.start} <ArrowRight size={17} /></span>
       </Link>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stat('Words learned', String(stats.wordsCount), <BookOpen size={18} />, 'bg-red-50 text-[#b91c1c]')}
-        {stat('Sentences learned', String(stats.sentencesCount), <GraduationCap size={18} />, 'bg-blue-50 text-blue-700')}
-        {stat('Mastered', String(stats.masteredCount), <Trophy size={18} />, 'bg-amber-50 text-amber-600')}
-        {stat('Accuracy', `${stats.accuracy}%`, <CheckCircle2 size={18} />, 'bg-emerald-50 text-emerald-600')}
+        {stat(t.dashboard.wordsLearned, String(stats.wordsCount), <BookOpen size={18} />, 'bg-red-50 text-[#b91c1c]')}
+        {stat(t.dashboard.sentencesLearned, String(stats.sentencesCount), <GraduationCap size={18} />, 'bg-blue-50 text-blue-700')}
+        {stat(t.dashboard.mastered, String(stats.masteredCount), <Trophy size={18} />, 'bg-amber-50 text-amber-600')}
+        {stat(t.dashboard.accuracy, `${stats.accuracy}%`, <CheckCircle2 size={18} />, 'bg-emerald-50 text-emerald-600')}
       </section>
 
       {/* Sentence Scramble Game Banner */}
@@ -298,13 +310,13 @@ export default function DashboardPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold">Sentence Scramble Game</h2>
+              <h2 className="text-lg font-bold">{t.dashboard.scrambleTitle}</h2>
               <span className="rounded-full bg-red-500/30 text-red-300 border border-red-400/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                Grammar Practice
+                {t.dashboard.grammarPractice}
               </span>
             </div>
             <p className="mt-1 text-xs text-stone-300 max-w-md">
-              Master Chinese word order (S-T-P-V-O) and grammar through interactive drag-and-drop sentence building.
+              {t.dashboard.scrambleDesc}
             </p>
           </div>
         </div>
@@ -312,16 +324,16 @@ export default function DashboardPage() {
           href="/scramble"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-xs font-bold text-stone-950 hover:bg-stone-100 shadow-md transition-all active:scale-95 shrink-0 w-full sm:w-auto"
         >
-          Play Game <ArrowRight size={15} />
+          {t.dashboard.playGame} <ArrowRight size={15} />
         </Link>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-bold">Recent classes</h2>
+            <h2 className="font-bold">{t.dashboard.recentClasses}</h2>
             <Link href="/classes" className="text-sm font-medium text-[#b91c1c]">
-              View all
+              {t.dashboard.viewAll}
             </Link>
           </div>
           <div className="space-y-1">

@@ -1,5 +1,6 @@
 import "./globals.css";
 import { QuizNotificationToaster } from "@/components/quiz-notification-toaster";
+import { LanguageProvider } from "@/lib/i18n";
 import type { Viewport } from "next";
 import { Noto_Sans_Khmer } from "next/font/google";
 
@@ -50,8 +51,10 @@ export default function Root({
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
       </head>
       <body className={`${notoSansKhmer.variable} bg-background font-sans text-foreground`}>
-        {children}
-        <QuizNotificationToaster />
+        <LanguageProvider>
+          {children}
+          <QuizNotificationToaster />
+        </LanguageProvider>
       </body>
     </html>
   );

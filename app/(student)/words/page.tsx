@@ -5,6 +5,7 @@ import { Heart, Search, Volume2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { fetchFavoriteIds, toggleFavorite } from '@/lib/favorites';
 import { speakChinese as speak } from '@/lib/speech';
+import { useLanguage } from '@/lib/i18n';
 
 type WordItem = {
   id: string;
@@ -38,6 +39,7 @@ const isWithinLast24Hours = (createdAt?: string | null) => {
 };
 
 export default function WordsPage() {
+  const { t } = useLanguage();
   const [words, setWords] = useState<WordItem[]>([]);
   const [q, setQ] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
@@ -149,9 +151,9 @@ export default function WordsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-[#b91c1c]">YOUR VOCABULARY</p>
-          <h1 className="mt-1 text-3xl font-bold">My words</h1>
-          <p className="mt-2 text-slate-500">ចុចលើពាក្យ ដើម្បីចូលទៅហាត់សរសេរអក្សរ។</p>
+          <p className="text-sm font-medium text-[#b91c1c]">{t.words.eyebrow}</p>
+          <h1 className="mt-1 text-3xl font-bold">{t.words.title}</h1>
+          <p className="mt-2 text-slate-500">{t.words.subtitle}</p>
         </div>
       </div>
 
@@ -161,18 +163,18 @@ export default function WordsPage() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search Chinese, Pinyin, Khmer, or English"
+            placeholder={t.words.searchPlaceholder}
             className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-[#b91c1c]"
           />
         </div>
         <div className="w-full sm:w-48">
-          <label className="block text-sm font-medium text-slate-700 mb-1">Class</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t.words.classLabel}</label>
           <select
             value={classFilter}
             onChange={(e) => setClassFilter(e.target.value)}
             className="w-full rounded-xl border border-stone-200 bg-white py-3 pl-3 pr-10 outline-none focus:ring-2 focus:ring-[#b91c1c] appearance-none"
           >
-            <option value="all">All Classes</option>
+            <option value="all">{t.words.allClasses}</option>
             {classesList.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -185,7 +187,7 @@ export default function WordsPage() {
       {favoriteError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{favoriteError}</p>}
 
       {loading ? (
-        <p className="text-slate-500">Loading words...</p>
+        <p className="text-slate-500">{t.words.loading}</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((w) => (
@@ -200,7 +202,7 @@ export default function WordsPage() {
                     <h2 className="text-3xl font-semibold">{w.chinese}</h2>
                     {w.isNew && (
                       <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#b91c1c] border border-red-200 animate-pulse">
-                        NEW
+                        {t.words.newBadge}
                       </span>
                     )}
                   </div>
@@ -246,7 +248,7 @@ export default function WordsPage() {
 
       {!loading && list.length === 0 && (
         <div className="rounded-2xl border border-dashed border-stone-300 p-10 text-center text-slate-500">
-          No words found. Try another search.
+          {t.words.noWordsFound}
         </div>
       )}
 
@@ -257,17 +259,17 @@ export default function WordsPage() {
             disabled={currentPage === 1}
             className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
           >
-            Previous
+            {t.words.previous}
           </button>
           <span className="text-sm font-medium text-slate-700">
-            Page {currentPage} of {totalPages}
+            {t.words.page} {currentPage} {t.words.of} {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
             className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
           >
-            Next
+            {t.words.next}
           </button>
         </div>
       )}

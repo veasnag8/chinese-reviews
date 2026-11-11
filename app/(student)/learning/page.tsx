@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Volume2, ChevronRight, ChevronDown, Check, X, Sparkles, RotateCcw, Mic, MicOff, ArrowLeft, BookOpen, Calendar, Eye, Play, GraduationCap, Layers } from 'lucide-react';
 import HanziWriter from 'hanzi-writer';
 import { speakChinese as speak } from '@/lib/speech';
+import { useLanguage } from '@/lib/i18n';
 import {
   classifySentenceLesson,
   classifyWordLesson,
@@ -75,6 +76,46 @@ type ActiveSession = {
 
 type LearningStep = 'select-date' | 'preview' | 'teach-words' | 'practice-writing' | 'speak-word' | 'show-sentences' | 'complete';
 
+const LESSON_THEME: Record<
+  LessonKey,
+  {
+    card: string;
+    header: string;
+    icon: string;
+    badge: string;
+    connector: string;
+  }
+> = {
+  'Lesson 1': {
+    card: 'border-sky-200/80 bg-sky-50/50',
+    header: 'bg-sky-50/90',
+    icon: 'border-sky-200 bg-sky-100 text-sky-700',
+    badge: 'bg-sky-100 text-sky-800',
+    connector: 'border-sky-200',
+  },
+  'Lesson 2': {
+    card: 'border-emerald-200/80 bg-emerald-50/50',
+    header: 'bg-emerald-50/90',
+    icon: 'border-emerald-200 bg-emerald-100 text-emerald-700',
+    badge: 'bg-emerald-100 text-emerald-800',
+    connector: 'border-emerald-200',
+  },
+  'Lesson 3': {
+    card: 'border-violet-200/80 bg-violet-50/50',
+    header: 'bg-violet-50/90',
+    icon: 'border-violet-200 bg-violet-100 text-violet-700',
+    badge: 'bg-violet-100 text-violet-800',
+    connector: 'border-violet-200',
+  },
+  'Outside Words': {
+    card: 'border-amber-200/80 bg-amber-50/50',
+    header: 'bg-amber-50/90',
+    icon: 'border-amber-200 bg-amber-100 text-amber-700',
+    badge: 'bg-amber-100 text-amber-800',
+    connector: 'border-amber-200',
+  },
+};
+
 type SpeechRecognitionInstance = {
   lang: string;
   interimResults: boolean;
@@ -87,6 +128,7 @@ type SpeechRecognitionInstance = {
 };
 
 export default function LearningPage() {
+  const { lang, t } = useLanguage();
   const [classRows, setClassRows] = useState<ClassRow[]>([]);
   const [allWords, setAllWords] = useState<LearningWord[]>([]);
   const [allSentences, setAllSentences] = useState<LearningSentence[]>([]);
@@ -641,12 +683,19 @@ export default function LearningPage() {
     });
   };
 
+  const lessonDisplayName = (key: LessonKey) => {
+    if (key === 'Lesson 1') return t.learning.lesson1;
+    if (key === 'Lesson 2') return t.learning.lesson2;
+    if (key === 'Lesson 3') return t.learning.lesson3;
+    return t.learning.outsideWords;
+  };
+
   if (loading) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-4 py-2 text-sm text-slate-500">
           <svg className="animate-spin h-5 w-5 text-[#b91c1c]" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round"/></svg>
-          Loading lessons...
+          {t.learning.loadingLessons}
         </div>
       </div>
     );
@@ -656,8 +705,8 @@ export default function LearningPage() {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-stone-300 p-10 text-center text-slate-500">
         <Sparkles className="mx-auto text-slate-300" size={48} />
-        <p className="mt-4 text-lg font-medium">No classes with words yet</p>
-        <p className="mt-2">Add words to a class first, then come here to learn.</p>
+        <p className="mt-4 text-lg font-medium">{t.learning.emptyTitle}</p>
+        <p className="mt-2">{t.learning.emptySubtitle}</p>
       </div>
     );
   }
@@ -666,10 +715,10 @@ export default function LearningPage() {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Learn</p>
-          <h1 className="mt-1 text-3xl font-bold">Choose a class &amp; lesson to start learning</h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{t.learning.eyebrow}</p>
+          <h1 className="mt-1 text-3xl font-bold">{t.learning.chooseTitle}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Organized by Class → Lesson (Lesson 1, Lesson 2, Lesson 3, Outside Words) → Date.
+            {t.learning.chooseSubtitle}
           </p>
         </div>
 
@@ -679,13 +728,13 @@ export default function LearningPage() {
             return (
               <section
                 key={classGroup.className}
-                className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-2xl border border-red-200/70 bg-white shadow-sm"
               >
                 {/* Level 1: Parent Class */}
                 <button
                   type="button"
                   onClick={() => toggleClassGroup(classGroup.className)}
-                  className="flex w-full items-center justify-between gap-4 bg-stone-50 px-5 py-4 text-left transition hover:bg-stone-100/80"
+                  className="flex w-full items-center justify-between gap-4 bg-gradient-to-r from-red-50/80 via-rose-50/50 to-amber-50/40 px-5 py-4 text-left transition hover:from-red-50 hover:to-amber-50/60"
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-[#b91c1c] text-white shadow-sm">
@@ -694,10 +743,10 @@ export default function LearningPage() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#b91c1c]">
-                          Class
+                          {t.learning.classBadge}
                         </span>
                         <span className="text-xs font-medium text-slate-500">
-                          {classGroup.lessons.length} lesson{classGroup.lessons.length !== 1 ? 's' : ''} · {classGroup.totalDates} date{classGroup.totalDates !== 1 ? 's' : ''}
+                          {classGroup.lessons.length} {lang === 'en' && classGroup.lessons.length === 1 ? t.learning.lessonUnit : t.learning.lessonsUnit} · {classGroup.totalDates} {lang === 'en' && classGroup.totalDates === 1 ? t.learning.dateUnit : t.learning.datesUnit}
                         </span>
                       </div>
                       <h2 className="mt-1 text-lg sm:text-xl font-bold text-slate-900 truncate">
@@ -706,11 +755,11 @@ export default function LearningPage() {
                       <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-600">
                         <span className="inline-flex items-center gap-1">
                           <span className="grid size-4 place-items-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">词</span>
-                          {classGroup.totalWords} word{classGroup.totalWords !== 1 ? 's' : ''}
+                          {classGroup.totalWords} {lang === 'en' && classGroup.totalWords === 1 ? t.learning.wordUnit : t.learning.wordsUnit}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <span className="grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">句</span>
-                          {classGroup.totalSentences} sentence{classGroup.totalSentences !== 1 ? 's' : ''}
+                          {classGroup.totalSentences} {lang === 'en' && classGroup.totalSentences === 1 ? t.learning.sentenceUnit : t.learning.sentencesUnit}
                         </span>
                       </div>
                     </div>
@@ -725,57 +774,55 @@ export default function LearningPage() {
 
                 {/* Level 2: Lessons under Class */}
                 {isClassExpanded && (
-                  <div className="border-t border-stone-200 bg-white px-4 py-4 sm:px-5 space-y-3">
+                  <div className="border-t border-red-100/80 bg-stone-50/50 px-4 py-4 sm:px-5 space-y-3.5">
                     {classGroup.lessons.map((lesson) => {
                       const lessonExpandKey = `${classGroup.className}::${lesson.lessonKey}`;
                       const isLessonExpanded = expandedLessons[lessonExpandKey] ?? true;
                       const isOutside = lesson.lessonKey === 'Outside Words';
                       const hasItems = lesson.words.length > 0 || lesson.sentences.length > 0;
+                      const theme = LESSON_THEME[lesson.lessonKey];
+                      const lessonLabel = lessonDisplayName(lesson.lessonKey);
 
                       return (
                         <div
                           key={lesson.lessonKey}
-                          className="overflow-hidden rounded-xl border border-stone-200 bg-stone-50/40"
+                          className={`overflow-hidden rounded-xl border shadow-xs ${theme.card}`}
                         >
-                          <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                          <div className={`flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between ${theme.header}`}>
                             <button
                               type="button"
                               onClick={() => toggleLesson(classGroup.className, lesson.lessonKey)}
                               className="flex flex-1 items-start gap-3 text-left min-w-0"
                             >
                               <span
-                                className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border shadow-xs ${
-                                  isOutside
-                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                    : 'border-red-100 bg-white text-[#b91c1c]'
-                                }`}
+                                className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border shadow-xs ${theme.icon}`}
                               >
                                 {isOutside ? <Layers size={17} /> : <BookOpen size={17} />}
                               </span>
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <h3 className="text-base font-bold text-slate-900">
-                                    {lesson.lessonKey}
+                                    {lessonLabel}
                                   </h3>
                                   {isOutside && (
-                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
-                                      Extra Vocabulary
+                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${theme.badge}`}>
+                                      {t.learning.extraVocab}
                                     </span>
                                   )}
                                   {lesson.dates.length > 0 && (
                                     <span className="text-xs text-slate-500">
-                                      · {lesson.dates.length} date{lesson.dates.length !== 1 ? 's' : ''}
+                                      · {lesson.dates.length} {lang === 'en' && lesson.dates.length === 1 ? t.learning.dateUnit : t.learning.datesUnit}
                                     </span>
                                   )}
                                 </div>
                                 <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-600">
                                   <span className="inline-flex items-center gap-1">
                                     <span className="grid size-4 place-items-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">词</span>
-                                    {lesson.words.length} word{lesson.words.length !== 1 ? 's' : ''}
+                                    {lesson.words.length} {lang === 'en' && lesson.words.length === 1 ? t.learning.wordUnit : t.learning.wordsUnit}
                                   </span>
                                   <span className="inline-flex items-center gap-1">
                                     <span className="grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">句</span>
-                                    {lesson.sentences.length} sentence{lesson.sentences.length !== 1 ? 's' : ''}
+                                    {lesson.sentences.length} {lang === 'en' && lesson.sentences.length === 1 ? t.learning.sentenceUnit : t.learning.sentencesUnit}
                                   </span>
                                 </div>
                               </div>
@@ -788,41 +835,41 @@ export default function LearningPage() {
                                     type="button"
                                     onClick={() =>
                                       openSession(
-                                        `${classGroup.className} · ${lesson.lessonKey}`,
-                                        'All dates in this lesson',
+                                        `${classGroup.className} · ${lessonLabel}`,
+                                        t.learning.allDatesInLesson,
                                         lesson.words,
                                         lesson.sentences,
                                         'preview'
                                       )
                                     }
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-stone-300 hover:bg-stone-50"
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-stone-300 hover:bg-stone-50"
                                   >
-                                    <Eye size={14} /> Preview
+                                    <Eye size={14} /> {t.learning.preview}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() =>
                                       openSession(
-                                        `${classGroup.className} · ${lesson.lessonKey}`,
-                                        'All dates in this lesson',
+                                        `${classGroup.className} · ${lessonLabel}`,
+                                        t.learning.allDatesInLesson,
                                         lesson.words,
                                         lesson.sentences,
                                         'learn'
                                       )
                                     }
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#b91c1c] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#991b1b]"
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#b91c1c] px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-[#991b1b]"
                                   >
-                                    <Play size={13} className="fill-current" /> Learn
+                                    <Play size={13} className="fill-current" /> {t.learning.learnBtn}
                                   </button>
                                 </>
                               ) : (
-                                <span className="text-xs italic text-slate-400">No words yet</span>
+                                <span className="text-xs italic text-slate-400">{t.learning.noWordsYet}</span>
                               )}
                               {lesson.dates.length > 0 && (
                                 <button
                                   type="button"
                                   onClick={() => toggleLesson(classGroup.className, lesson.lessonKey)}
-                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-stone-200/60 hover:text-slate-600"
+                                  className="rounded-lg p-1.5 text-slate-500 hover:bg-white/70 hover:text-slate-700"
                                   aria-label={`Toggle ${lesson.lessonKey} dates`}
                                 >
                                   <ChevronDown
@@ -838,21 +885,21 @@ export default function LearningPage() {
 
                           {/* Level 3: Date Subtasks under Lesson */}
                           {isLessonExpanded && lesson.dates.length > 0 && (
-                            <div className="border-t border-stone-200/80 bg-white px-4 py-3">
-                              <div className="relative space-y-2 border-l-2 border-stone-200 pl-4">
+                            <div className="border-t border-stone-200/70 bg-white/75 px-4 py-3">
+                              <div className={`relative space-y-2 border-l-2 pl-4 ${theme.connector}`}>
                                 {lesson.dates.map((dateItem) => (
                                   <div
                                     key={`${lesson.lessonKey}-${dateItem.classId}`}
-                                    className="relative flex flex-col gap-2.5 rounded-xl border border-stone-200 bg-stone-50/50 p-3 transition hover:border-red-200 hover:bg-white sm:flex-row sm:items-center sm:justify-between"
+                                    className="relative flex flex-col gap-2.5 rounded-xl border border-stone-200/90 bg-white p-3 shadow-2xs transition hover:border-red-200 hover:bg-rose-50/30 sm:flex-row sm:items-center sm:justify-between"
                                   >
                                     <span
                                       aria-hidden="true"
-                                      className="absolute -left-[18px] top-5 h-0.5 w-3.5 bg-stone-200"
+                                      className={`absolute -left-[18px] top-5 h-0.5 w-3.5 border-t-2 ${theme.connector}`}
                                     />
                                     <div
                                       onClick={() =>
                                         openSession(
-                                          `${classGroup.className} · ${lesson.lessonKey}`,
+                                          `${classGroup.className} · ${lessonLabel}`,
                                           formatDateLabel(dateItem.date),
                                           dateItem.words,
                                           dateItem.sentences,
@@ -869,9 +916,9 @@ export default function LearningPage() {
                                           {formatDateLabel(dateItem.date)}
                                         </p>
                                         <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                                          <span>{dateItem.words.length} word{dateItem.words.length !== 1 ? 's' : ''}</span>
+                                          <span>{dateItem.words.length} {lang === 'en' && dateItem.words.length === 1 ? t.learning.wordUnit : t.learning.wordsUnit}</span>
                                           <span>·</span>
-                                          <span>{dateItem.sentences.length} sentence{dateItem.sentences.length !== 1 ? 's' : ''}</span>
+                                          <span>{dateItem.sentences.length} {lang === 'en' && dateItem.sentences.length === 1 ? t.learning.sentenceUnit : t.learning.sentencesUnit}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -881,7 +928,7 @@ export default function LearningPage() {
                                         type="button"
                                         onClick={() =>
                                           openSession(
-                                            `${classGroup.className} · ${lesson.lessonKey}`,
+                                            `${classGroup.className} · ${lessonLabel}`,
                                             formatDateLabel(dateItem.date),
                                             dateItem.words,
                                             dateItem.sentences,
@@ -890,13 +937,13 @@ export default function LearningPage() {
                                         }
                                         className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-stone-50"
                                       >
-                                        <Eye size={13} /> Preview
+                                        <Eye size={13} /> {t.learning.preview}
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() =>
                                           openSession(
-                                            `${classGroup.className} · ${lesson.lessonKey}`,
+                                            `${classGroup.className} · ${lessonLabel}`,
                                             formatDateLabel(dateItem.date),
                                             dateItem.words,
                                             dateItem.sentences,
@@ -905,7 +952,7 @@ export default function LearningPage() {
                                         }
                                         className="inline-flex items-center gap-1 rounded-lg bg-[#b91c1c] px-3 py-1 text-xs font-semibold text-white hover:bg-[#991b1b]"
                                       >
-                                        <Play size={12} className="fill-current" /> Learn
+                                        <Play size={12} className="fill-current" /> {t.learning.learnBtn}
                                       </button>
                                     </div>
                                   </div>
@@ -939,12 +986,12 @@ export default function LearningPage() {
               }}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#b91c1c]"
             >
-              <ArrowLeft size={16} /> Back to Lessons
+              <ArrowLeft size={16} /> {t.learning.backToLessons}
             </button>
             <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
               {activeSession.title} · {activeSession.subtitle}
             </p>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-bold">Preview Words &amp; Sentences</h1>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold">{t.learning.previewTitle}</h1>
           </div>
           {(words.length > 0 || sentences.length > 0) && (
             <button
@@ -958,7 +1005,7 @@ export default function LearningPage() {
               }}
               className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#991b1b]"
             >
-              <Play size={15} className="fill-current" /> Start Practice
+              <Play size={15} className="fill-current" /> {t.learning.startPractice}
             </button>
           )}
         </div>
@@ -968,11 +1015,11 @@ export default function LearningPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
               <span className="grid size-6 place-items-center rounded-full bg-red-100 text-xs font-bold text-red-600">词</span>
-              Words ({words.length})
+              {t.learning.wordsHeading} ({words.length})
             </h2>
           </div>
           {words.length === 0 ? (
-            <p className="text-sm text-slate-500">No words in this selection yet.</p>
+            <p className="text-sm text-slate-500">{t.learning.noWordsSelection}</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {words.map((w, idx) => (
@@ -1008,11 +1055,11 @@ export default function LearningPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
               <span className="grid size-6 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">句</span>
-              Sentences ({sentences.length})
+              {t.learning.sentencesHeading} ({sentences.length})
             </h2>
           </div>
           {sentences.length === 0 ? (
-            <p className="text-sm text-slate-500">No sentences in this selection yet.</p>
+            <p className="text-sm text-slate-500">{t.learning.noSentencesSelection}</p>
           ) : (
             <div className="space-y-3">
               {sentences.map((s, idx) => (
@@ -1060,20 +1107,20 @@ export default function LearningPage() {
                 }}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
               >
-                <ArrowLeft size={14} /> Lessons
+                <ArrowLeft size={14} /> {t.learning.lessonsBtn}
               </button>
               <button
                 type="button"
                 onClick={() => setStep('preview')}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
               >
-                <Eye size={14} /> Preview All
+                <Eye size={14} /> {t.learning.previewAll}
               </button>
             </div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
               {activeSession?.title} {activeSession?.subtitle ? `· ${activeSession.subtitle}` : ''}
             </p>
-            <h1 className="mt-1 text-2xl font-bold">Learn Words</h1>
+            <h1 className="mt-1 text-2xl font-bold">{t.learning.learnWordsTitle}</h1>
           </div>
           <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold shrink-0">
             {currentWordIndex + 1} / {words.length}
@@ -1084,7 +1131,7 @@ export default function LearningPage() {
         </div>
 
         <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
-          <p className="text-sm text-slate-500">Listen to the word</p>
+          <p className="text-sm text-slate-500">{t.learning.listenWord}</p>
           <p className="mt-5 text-4xl font-semibold sm:text-6xl">{currentWord.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <span className="text-xl text-slate-500">{currentWord.pinyin}</span>
@@ -1103,7 +1150,7 @@ export default function LearningPage() {
 
           {wordPlayed && (
             <div className="mt-8 flex items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-              <Check size={16} className="mr-1" /> Pronunciation played. Ready for practice!
+              <Check size={16} className="mr-1" /> {t.learning.pronunciationPlayed}
             </div>
           )}
         </section>
@@ -1114,7 +1161,7 @@ export default function LearningPage() {
             onClick={() => setStep('practice-writing')}
             className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-6 py-3 text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Start Practice Writing <ChevronRight size={17} />
+            {t.learning.startPracticeWriting} <ChevronRight size={17} />
           </button>
         </div>
       </div>
@@ -1130,7 +1177,7 @@ export default function LearningPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{activeSession?.title}</p>
-            <h1 className="mt-1 text-2xl font-bold">Practice Writing</h1>
+            <h1 className="mt-1 text-2xl font-bold">{t.learning.practiceWritingTitle}</h1>
           </div>
           <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
             {currentWordIndex + 1} / {words.length}
@@ -1138,7 +1185,7 @@ export default function LearningPage() {
         </div>
 
         <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
-          <p className="text-sm text-slate-500">Write the character</p>
+          <p className="text-sm text-slate-500">{t.learning.writeCharacter}</p>
           <p className="mt-5 text-4xl font-semibold sm:text-6xl">{currentWord.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <span className="text-xl text-slate-500">{currentWord.pinyin}</span>
@@ -1201,7 +1248,7 @@ export default function LearningPage() {
 
           {/* Current character display */}
           <div className="mt-4 text-center">
-            <p className="text-sm text-slate-500">Current character:</p>
+            <p className="text-sm text-slate-500">{t.learning.currentCharacter}</p>
             <p className="mt-1 text-4xl font-bold tracking-wide text-[#b91c1c] sm:text-5xl">{character}</p>
             <p className="text-sm text-slate-500">{currentWord.pinyin}</p>
           </div>
@@ -1232,14 +1279,14 @@ export default function LearningPage() {
               onClick={handleReplayWrite}
               className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
             >
-              <RotateCcw size={16} /> Replay
+              <RotateCcw size={16} /> {t.learning.replay}
             </button>
             {!writeComplete && (
               <button
                 onClick={handleReplayWord}
                 className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm"
               >
-                <Volume2 size={16} /> Listen Again
+                <Volume2 size={16} /> {t.learning.listenAgain}
               </button>
             )}
             {isLastChar && writeComplete && (
@@ -1247,7 +1294,7 @@ export default function LearningPage() {
                 onClick={handleWritingComplete}
                 className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
               >
-                <Check size={16} /> Continue to Speaking
+                <Check size={16} /> {t.learning.continueToSpeaking}
               </button>
             )}
             {!isLastChar && writeComplete && (
@@ -1255,7 +1302,7 @@ export default function LearningPage() {
                 onClick={() => setCharIndex(charIndex + 1)}
                 className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm"
               >
-                Next Character <ChevronRight size={16} />
+                {t.learning.nextCharacter} <ChevronRight size={16} />
               </button>
             )}
           </div>
@@ -1270,7 +1317,7 @@ export default function LearningPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{activeSession?.title}</p>
-            <h1 className="mt-1 text-2xl font-bold">Speak the Word</h1>
+            <h1 className="mt-1 text-2xl font-bold">{t.learning.speakWordTitle}</h1>
           </div>
           <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
             {currentWordIndex + 1} / {words.length}
@@ -1278,7 +1325,7 @@ export default function LearningPage() {
         </div>
 
         <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
-          <p className="text-sm text-slate-500">Say the word aloud</p>
+          <p className="text-sm text-slate-500">{t.learning.sayWordAloud}</p>
           <p className="mt-5 text-4xl font-semibold tracking-wide sm:text-6xl">{currentWord.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <span className="text-xl font-medium text-slate-600">{currentWord.pinyin}</span>
@@ -1301,10 +1348,10 @@ export default function LearningPage() {
             {speechDone ? (
               <div className="w-full max-w-md space-y-4">
                 <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2.5 text-emerald-800 font-semibold shadow-sm">
-                  <Check size={20} className="stroke-[3]" /> Correct! Well done.
+                  <Check size={20} className="stroke-[3]" /> {t.learning.correctWellDone}
                 </div>
                 <p className="text-sm text-slate-600">
-                  You said: <span className="font-semibold text-emerald-700">{speechResult || currentWord.chinese}</span>
+                  {t.learning.youSaid} <span className="font-semibold text-emerald-700">{speechResult || currentWord.chinese}</span>
                 </p>
 
                 <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -1317,13 +1364,13 @@ export default function LearningPage() {
                     onTouchCancel={stopHoldSpeaking}
                     className="select-none touch-none inline-flex items-center gap-2 rounded-xl border border-stone-300 bg-stone-50 px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
                   >
-                    <Mic size={15} /> Hold to Practice Again
+                    <Mic size={15} /> {t.learning.holdPracticeAgain}
                   </button>
                   <button
                     onClick={handleNextWord}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#b91c1c] px-6 py-3 text-sm font-semibold text-white hover:bg-[#991b1b] shadow-md shadow-red-200 active:scale-95 transition-all w-full sm:w-auto"
                   >
-                    {isLastWord && sentences.length > 0 ? 'Go to Sentences' : isLastWord ? 'Complete' : 'Next Word'} <ChevronRight size={18} />
+                    {isLastWord && sentences.length > 0 ? t.learning.goToSentences : isLastWord ? t.learning.completeBtn : t.learning.nextWord} <ChevronRight size={18} />
                   </button>
                 </div>
               </div>
@@ -1346,7 +1393,7 @@ export default function LearningPage() {
                         ? 'bg-red-600 text-white shadow-red-300 scale-105 ring-4 ring-red-300'
                         : 'bg-[#b91c1c] text-white hover:bg-[#991b1b] shadow-stone-300 hover:scale-105'
                     }`}
-                    aria-label="Hold to speak"
+                    aria-label={t.learning.holdToSpeak}
                   >
                     <Mic size={40} className={speechRecognizing ? 'animate-pulse' : ''} />
                   </button>
@@ -1355,19 +1402,19 @@ export default function LearningPage() {
                 {/* Instructions */}
                 <div>
                   <p className="text-base font-bold text-slate-800">
-                    {speechRecognizing ? '🔴 Recording... Keep holding & speak!' : 'ចុចសង្កត់ដើម្បីនិយាយ / Hold to Speak'}
+                    {speechRecognizing ? t.learning.recordingHold : t.learning.holdToSpeak}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {speechRecognizing
-                      ? `Say: "${currentWord.chinese}" clearly`
-                      : 'Hold button with mouse or finger, speak the word, then release'}
+                      ? `${t.learning.sayClearly} "${currentWord.chinese}"`
+                      : t.learning.holdInstruction}
                   </p>
                 </div>
 
                 {/* Spoken result / feedback */}
                 {speechResult && !speechDone && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                    Heard: <span className="font-semibold">{speechResult}</span> — Try holding and speaking again!
+                    {t.learning.youSaid} <span className="font-semibold">{speechResult}</span>
                   </div>
                 )}
 
@@ -1386,7 +1433,7 @@ export default function LearningPage() {
                     }}
                     className="text-xs font-semibold text-slate-400 hover:text-slate-600 hover:underline"
                   >
-                    Skip pronunciation practice →
+                    {t.learning.skipPronunciation}
                   </button>
                 </div>
               </div>
@@ -1411,20 +1458,20 @@ export default function LearningPage() {
                 }}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
               >
-                <ArrowLeft size={14} /> Lessons
+                <ArrowLeft size={14} /> {t.learning.lessonsBtn}
               </button>
               <button
                 type="button"
                 onClick={() => setStep('preview')}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
               >
-                <Eye size={14} /> Preview All
+                <Eye size={14} /> {t.learning.previewAll}
               </button>
             </div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
               {activeSession?.title} {activeSession?.subtitle ? `· ${activeSession.subtitle}` : ''}
             </p>
-            <h1 className="mt-1 text-2xl font-bold">Sentences</h1>
+            <h1 className="mt-1 text-2xl font-bold">{t.learning.sentencesHeading}</h1>
           </div>
           <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold shrink-0">
             {currentSentenceIndex + 1} / {sentences.length}
@@ -1435,7 +1482,7 @@ export default function LearningPage() {
         </div>
 
         <section className="rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm sm:p-8">
-          <p className="text-sm text-slate-500">Listen to the sentence</p>
+          <p className="text-sm text-slate-500">{t.learning.listenSentence}</p>
           <p className="mt-5 text-3xl font-semibold leading-relaxed">{currentSentence.chinese}</p>
           <div className="mt-4 flex items-center justify-center gap-3">
             <span className="text-base text-slate-500">{currentSentence.pinyin}</span>
@@ -1462,7 +1509,7 @@ export default function LearningPage() {
               }}
               className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm"
             >
-              <ChevronRight className="-rotate-180" size={17} /> Previous
+              <ChevronRight className="-rotate-180" size={17} /> {t.learning.previous}
             </button>
           )}
           <button
@@ -1472,7 +1519,7 @@ export default function LearningPage() {
             }}
             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white"
           >
-            {isLastSentence ? 'Complete Learning' : 'Next Sentence'} <ChevronRight size={17} />
+            {isLastSentence ? t.learning.completeLearning : t.learning.nextSentence} <ChevronRight size={17} />
           </button>
         </div>
       </div>
@@ -1484,10 +1531,10 @@ export default function LearningPage() {
       <div className="mx-auto max-w-xl space-y-6 text-center">
         <div className="rounded-3xl border border-stone-200 bg-white p-10 shadow-sm">
           <Sparkles className="mx-auto text-amber-500" size={48} />
-          <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">LEARNING COMPLETE</p>
-          <h1 className="mt-2 text-3xl font-bold">Great job! You finished {activeSession?.title}</h1>
+          <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">{t.learning.learningComplete}</p>
+          <h1 className="mt-2 text-3xl font-bold">{t.learning.greatJobFinished} {activeSession?.title}</h1>
           <p className="mt-4 text-slate-600">
-            You learned {words.length} word{words.length !== 1 ? 's' : ''} and {sentences.length} sentence{sentences.length !== 1 ? 's' : ''}.
+            {t.learning.youLearned} {words.length} {lang === 'en' && words.length === 1 ? t.learning.wordUnit : t.learning.wordsUnit} {t.learning.andWord} {sentences.length} {lang === 'en' && sentences.length === 1 ? t.learning.sentenceUnit : t.learning.sentencesUnit}.
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-3">
@@ -1498,13 +1545,13 @@ export default function LearningPage() {
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
           >
-            <ArrowLeft size={17} /> Choose Another Lesson
+            <ArrowLeft size={17} /> {t.learning.chooseAnotherLesson}
           </button>
           <button
             onClick={() => setStep('preview')}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
           >
-            <Eye size={17} /> Preview Words &amp; Sentences
+            <Eye size={17} /> {t.learning.previewWordsSentences}
           </button>
           <button
             onClick={() => {
@@ -1517,7 +1564,7 @@ export default function LearningPage() {
             }}
             className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white"
           >
-            <RotateCcw size={17} /> Repeat This Date
+            <RotateCcw size={17} /> {t.learning.repeatThisDate}
           </button>
         </div>
       </div>

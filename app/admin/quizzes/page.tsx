@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BarChart3, Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { BarChart3, BellRing, Eye, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { useRole } from '@/lib/use-role';
+import { sendQuizTelegramAlert } from '@/lib/telegram';
 import {
   deleteQuiz,
   effectiveStatus,
@@ -40,6 +41,8 @@ export default function AdminQuizzesPage() {
   const [actionError, setActionError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<QuizSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [alertingQuizId, setAlertingQuizId] = useState<string | null>(null);
+  const [alertedQuizIds, setAlertedQuizIds] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
@@ -81,6 +84,26 @@ export default function AdminQuizzesPage() {
         .includes(query)
     );
   }, [quizzes, search]);
+
+  const alertGroupQuiz = async (quiz: QuizSummary) => {
+    setAlertingQuizId(quiz.id);
+    setActionError('');
+    setFlash('');
+    const result = await sendQuizTelegramAlert({
+      quizId: quiz.id,
+      title: quiz.title,
+      description: quiz.description,
+      questionCount: quiz.question_count,
+      deadline: quiz.deadline,
+    });
+    setAlertingQuizId(null);
+    if (!result.ok) {
+      setActionError(result.error || 'Failed to alert Telegram group.');
+      return;
+    }
+    setAlertedQuizIds((current) => ({ ...current, [quiz.id]: true }));
+    setFlash(`Telegram group alerted for "${quiz.title}".`);
+  };
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
@@ -231,6 +254,23 @@ export default function AdminQuizzesPage() {
                         >
                           <BarChart3 size={13} /> Results
                         </Link>
+                        <button
+                          type="button"
+                          disabled={alertingQuizId === quiz.id}
+                          onClick={() => void alertGroupQuiz(quiz)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                        >
+                          {alertingQuizId === quiz.id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <BellRing size={13} />
+                          )}
+                          {alertingQuizId === quiz.id
+                            ? 'Sending...'
+                            : alertedQuizIds[quiz.id]
+                              ? 'Alerted ✓'
+                              : 'Alert Group'}
+                        </button>
                         {isAdmin && (
                           <Link
                             href={`/admin/quizzes/${quiz.id}/edit`}
@@ -309,6 +349,23 @@ export default function AdminQuizzesPage() {
                   >
                     <BarChart3 size={13} /> Results
                   </Link>
+                  <button
+                    type="button"
+                    disabled={alertingQuizId === quiz.id}
+                    onClick={() => void alertGroupQuiz(quiz)}
+                    className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    {alertingQuizId === quiz.id ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <BellRing size={13} />
+                    )}
+                    {alertingQuizId === quiz.id
+                      ? 'Sending...'
+                      : alertedQuizIds[quiz.id]
+                        ? 'Alerted ✓'
+                        : 'Alert Group'}
+                  </button>
                   {isAdmin && (
                     <Link
                       href={`/admin/quizzes/${quiz.id}/edit`}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, Clock3, ImageIcon, LayoutGrid, List, Loader2, NotebookPen, RefreshCw, Send, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useLanguage } from '@/lib/i18n';
 
 type Assignment = {
   id: string;
@@ -32,6 +33,7 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export default function ForYouPage() {
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [items, setItems] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,42 +144,42 @@ export default function ForYouPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Your assignments</p><h1 className="mt-1 text-3xl font-bold">Homework</h1><p className="mt-2 text-slate-500">Complete the homework assigned by your teacher before it expires.</p></div>
+        <div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{t.homework.eyebrow}</p><h1 className="mt-1 text-3xl font-bold">{t.homework.title}</h1><p className="mt-2 text-slate-500">{t.homework.subtitle}</p></div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-xl border border-stone-200 bg-white p-1" aria-label="Homework view">
             <button type="button" onClick={() => changeView('grid')} aria-label="Grid view" aria-pressed={viewMode === 'grid'} className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg ${viewMode === 'grid' ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-500 hover:bg-stone-50'}`}><LayoutGrid size={18} /></button>
             <button type="button" onClick={() => changeView('list')} aria-label="List view" aria-pressed={viewMode === 'list'} className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg ${viewMode === 'list' ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-500 hover:bg-stone-50'}`}><List size={19} /></button>
           </div>
-          <button type="button" onClick={() => void load()} className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-stone-50"><RefreshCw size={17} /><span className="hidden sm:inline">Refresh</span></button>
+          <button type="button" onClick={() => void load()} className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-stone-50"><RefreshCw size={17} /><span className="hidden sm:inline">{t.homework.refresh}</span></button>
         </div>
       </div>
       {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {loading ? <p className="text-slate-500">Loading your practice...</p> : items.length > 0 ? (
+      {loading ? <p className="text-slate-500">{t.homework.loading}</p> : items.length > 0 ? (
         <div className={viewMode === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'grid max-w-5xl gap-4'}>{items.map((item) => (
           <article key={item.id} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3"><span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-[#b91c1c]"><ImageIcon size={13} />Image homework</span></div>
+            <div className="flex items-start justify-between gap-3"><span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-[#b91c1c]"><ImageIcon size={13} />{t.homework.imageHomework}</span></div>
             {promptUrls[item.id] && <a href={promptUrls[item.id]} target="_blank" rel="noreferrer" className="mt-4 block overflow-hidden rounded-xl border border-stone-200"><img src={promptUrls[item.id]} alt="Homework provided by teacher" className="max-h-72 w-full bg-stone-50 object-contain" /></a>}
             <h2 className="mt-4 text-xl font-bold text-slate-900">{item.title}</h2>
             {item.description && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{item.description}</p>}
-            <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 size={14} /> Available until {new Date(item.expires_at).toLocaleString()}</p>
+            <p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500"><Clock3 size={14} /> {t.homework.availableUntil} {new Date(item.expires_at).toLocaleString()}</p>
             {submissions[item.id] && (
               <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-500">Your submitted answer</span><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${submissions[item.id].status === 'checked' ? 'bg-emerald-100 text-emerald-700' : submissions[item.id].status === 'needs_revision' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{submissions[item.id].status === 'checked' ? <CheckCircle2 size={13} /> : <Clock3 size={13} />}{submissions[item.id].status === 'checked' ? 'Checked' : submissions[item.id].status === 'needs_revision' ? 'Check Again' : 'Pending Checking'}</span></div>
-                {submissions[item.id].status === 'needs_revision' && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><p className="font-semibold">Please check your homework again before resubmit.</p>{submissions[item.id].remark && <p className="mt-1 whitespace-pre-wrap">Remark: {submissions[item.id].remark}</p>}</div>}
-                {submissions[item.id].status === 'checked' && submissions[item.id].remark && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><span className="font-semibold">Teacher remark:</span> {submissions[item.id].remark}</div>}
+                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-500">{t.homework.yourAnswer}</span><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${submissions[item.id].status === 'checked' ? 'bg-emerald-100 text-emerald-700' : submissions[item.id].status === 'needs_revision' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{submissions[item.id].status === 'checked' ? <CheckCircle2 size={13} /> : <Clock3 size={13} />}{submissions[item.id].status === 'checked' ? t.homework.checked : submissions[item.id].status === 'needs_revision' ? t.homework.checkAgain : t.homework.pendingChecking}</span></div>
+                {submissions[item.id].status === 'needs_revision' && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><p className="font-semibold">{t.homework.checkAgainNotice}</p>{submissions[item.id].remark && <p className="mt-1 whitespace-pre-wrap">{t.homework.remark} {submissions[item.id].remark}</p>}</div>}
+                {submissions[item.id].status === 'checked' && submissions[item.id].remark && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"><span className="font-semibold">{t.homework.teacherRemark}</span> {submissions[item.id].remark}</div>}
                 {answerUrls[item.id] && <a href={answerUrls[item.id]} target="_blank" rel="noreferrer"><img src={answerUrls[item.id]} alt="Your homework answer" className="mt-3 max-h-48 w-full rounded-lg object-contain" /></a>}
               </div>
             )}
             <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-500 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
               {uploadingId === item.id ? <Loader2 size={16} className="animate-spin" /> : submissions[item.id] ? <Upload size={16} /> : <Send size={16} />}
-              {uploadingId === item.id ? 'Uploading...' : submissions[item.id]?.status === 'checked' ? 'Homework checked' : submissions[item.id] ? 'Resubmit answer image' : 'Submit answer image'}
+              {uploadingId === item.id ? t.homework.uploading : submissions[item.id]?.status === 'checked' ? t.homework.homeworkChecked : submissions[item.id] ? t.homework.resubmitAnswer : t.homework.submitAnswer}
               <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={uploadingId !== null || submissions[item.id]?.status === 'checked'} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void submitAnswer(item.id, file); }} />
             </label>
-            <p className="mt-2 flex items-center justify-center gap-1 text-xs text-slate-400"><ImageIcon size={13} /> JPEG, PNG or WebP · Max 5 MB</p>
+            <p className="mt-2 flex items-center justify-center gap-1 text-xs text-slate-400"><ImageIcon size={13} /> {t.homework.fileHint}</p>
           </article>
         ))}</div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center"><NotebookPen className="mx-auto text-stone-300" size={40} /><h2 className="mt-3 text-lg font-bold">No homework right now</h2><p className="mt-1 text-sm text-slate-500">New homework from your teacher will appear here.</p></div>
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center"><NotebookPen className="mx-auto text-stone-300" size={40} /><h2 className="mt-3 text-lg font-bold">{t.homework.noHomeworkTitle}</h2><p className="mt-1 text-sm text-slate-500">{t.homework.noHomeworkDesc}</p></div>
       )}
     </div>
   );

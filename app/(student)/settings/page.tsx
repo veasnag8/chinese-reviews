@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { LogOut } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { lang, setLang, t } = useLanguage();
 
   const [user, setUser] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -140,18 +142,43 @@ export default function SettingsPage() {
         <Card className="p-5 sm:p-8">
           {success && (
             <div className="mb-4 p-4 rounded-md bg-green-100 text-green-800">
-              Profile updated successfully!
+              {t.settings.updated}
             </div>
           )}
 
           <h2 className="text-2xl font-bold text-foreground mb-6">
-            Settings
+            {t.settings.title}
           </h2>
+
+          <div className="mb-6 rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{t.settings.appLanguage}</p>
+                <p className="text-xs text-slate-500">{t.settings.appLanguageDesc}</p>
+              </div>
+              <div className="inline-flex shrink-0 rounded-xl border border-stone-200 bg-white p-1 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setLang('en')}
+                  className={`rounded-lg px-3 py-1.5 transition ${lang === 'en' ? 'bg-[#b91c1c] text-white' : 'text-slate-600 hover:bg-stone-100'}`}
+                >
+                  EN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLang('kh')}
+                  className={`rounded-lg px-3 py-1.5 transition ${lang === 'kh' ? 'bg-[#b91c1c] text-white' : 'text-slate-600 hover:bg-stone-100'}`}
+                >
+                  KH
+                </button>
+              </div>
+            </div>
+          </div>
 
           <form onSubmit={onUpdateProfile}>
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2">
-                Full Name
+                {t.settings.fullName}
               </label>
 
               <Input
@@ -165,7 +192,7 @@ export default function SettingsPage() {
 
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2">
-                Native Language
+                {t.settings.nativeLanguage}
               </label>
 
               <Input
@@ -179,7 +206,7 @@ export default function SettingsPage() {
 
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2">
-                Target Language
+                {t.settings.targetLanguage}
               </label>
 
               <Input
@@ -211,7 +238,7 @@ export default function SettingsPage() {
               disabled={isLoading}
               className="w-full"
             >
-              {isLoading ? "Saving..." : "Update Profile"}
+              {isLoading ? t.settings.saving : t.settings.saveChanges}
             </Button>
           </form>
 
@@ -220,7 +247,7 @@ export default function SettingsPage() {
             onClick={logout}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
           >
-            <LogOut size={17} /> Log out
+            <LogOut size={17} /> {t.settings.signOut}
           </button>
         </Card>
       </div>

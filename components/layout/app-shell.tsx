@@ -3,40 +3,44 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BookOpen, Brain, CalendarDays, ChartNoAxesColumnIncreasing, ChevronDown, ClipboardList, Gamepad2, GraduationCap, Heart, House, List, ListChecks, LogOut, Menu, MessageCircle, NotebookPen, PenLine, Settings, ShieldCheck, Sparkles, TextQuote, Users, X } from 'lucide-react';
+import { BookOpen, Brain, CalendarDays, ChartNoAxesColumnIncreasing, ChevronDown, ClipboardList, Gamepad2, GraduationCap, Heart, House, Languages, List, ListChecks, LogOut, Menu, MessageCircle, NotebookPen, PenLine, Settings, ShieldCheck, Sparkles, TextQuote, Users, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useLanguage, type TranslationDict } from '@/lib/i18n';
 
-const navigation = [
-  { href: '/dashboard', label: 'Dashboard', icon: House, admin: false },
-  { href: '/ai-tutor', label: 'AI Tutor', icon: Sparkles, admin: false },
-  { href: '/learning', label: 'Learn', icon: Brain, admin: false },
-  { href: '/daily', label: 'Daily', icon: CalendarDays, admin: false },
-  { href: '/words', label: 'My Words', icon: BookOpen, admin: false },
-  { href: '/for-you', label: 'Homework', icon: NotebookPen, admin: false },
-  { href: '/sentences', label: 'Sentence', icon: TextQuote, admin: false },
-  { href: '/conversations', label: 'Conversation', icon: MessageCircle, admin: false },
-  { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
-  { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
-  { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
-  { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
-  { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
-  { href: '/favorites', label: 'Favorites', icon: Heart, admin: false },
-  { href: '/progress', label: 'Progress', icon: ChartNoAxesColumnIncreasing, admin: false },
-  { href: '/admin/users', label: 'User List', icon: Users, admin: true },
-  { href: '/settings', label: 'Settings', icon: Settings, admin: false },
+type NavKey = keyof TranslationDict['nav'];
+
+const navigation: { href: string; key: NavKey; icon: any; admin: boolean }[] = [
+  { href: '/dashboard', key: 'dashboard', icon: House, admin: false },
+  { href: '/ai-tutor', key: 'aiTutor', icon: Sparkles, admin: false },
+  { href: '/learning', key: 'learn', icon: Brain, admin: false },
+  { href: '/daily', key: 'daily', icon: CalendarDays, admin: false },
+  { href: '/words', key: 'myWords', icon: BookOpen, admin: false },
+  { href: '/for-you', key: 'homework', icon: NotebookPen, admin: false },
+  { href: '/sentences', key: 'sentence', icon: TextQuote, admin: false },
+  { href: '/conversations', key: 'conversation', icon: MessageCircle, admin: false },
+  { href: '/scramble', key: 'sentenceGame', icon: Gamepad2, admin: false },
+  { href: '/classes', key: 'myClasses', icon: CalendarDays, admin: false },
+  { href: '/quizzes', key: 'quiz', icon: ListChecks, admin: false },
+  { href: '/review', key: 'review', icon: GraduationCap, admin: false },
+  { href: '/writing', key: 'practiceWriting', icon: PenLine, admin: false },
+  { href: '/favorites', key: 'favorites', icon: Heart, admin: false },
+  { href: '/progress', key: 'progress', icon: ChartNoAxesColumnIncreasing, admin: false },
+  { href: '/admin/users', key: 'userList', icon: Users, admin: true },
+  { href: '/settings', key: 'settings', icon: Settings, admin: false },
 ];
 
-const managementItems = [
-  { href: '/admin/for-you', label: 'Create Homework', icon: NotebookPen },
-  { href: '/admin/words', label: 'Word List', icon: List },
-  { href: '/sentences', label: 'Add Sentence', icon: TextQuote },
-  { href: '/admin/quizzes', label: 'Quiz Management', icon: ClipboardList },
+const managementItems: { href: string; key: NavKey; icon: any }[] = [
+  { href: '/admin/for-you', key: 'createHomework', icon: NotebookPen },
+  { href: '/admin/words', key: 'wordList', icon: List },
+  { href: '/sentences', key: 'addSentence', icon: TextQuote },
+  { href: '/admin/quizzes', key: 'quizManagement', icon: ClipboardList },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { lang, setLang, t } = useLanguage();
   const [isStaff, setIsStaff] = useState(false);
   const [isStaffLoaded, setIsStaffLoaded] = useState(false);
   const [displayName, setDisplayName] = useState('User');
@@ -50,27 +54,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(pathname.startsWith('/admin'));
 
-  const mobileNavItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: House },
-    { href: '/learning', label: 'Learn', icon: Brain },
-    { href: '/daily', label: 'Daily', icon: CalendarDays },
-    { href: '/words', label: 'My Words', icon: BookOpen },
-    { href: '/sentences', label: 'Sentence', icon: TextQuote },
+  const mobileNavItems: { href: string; key: NavKey; icon: any }[] = [
+    { href: '/dashboard', key: 'dashboard', icon: House },
+    { href: '/learning', key: 'learn', icon: Brain },
+    { href: '/daily', key: 'daily', icon: CalendarDays },
+    { href: '/words', key: 'myWords', icon: BookOpen },
+    { href: '/sentences', key: 'sentence', icon: TextQuote },
   ];
 
-  const overflowItems = [
-    { href: '/ai-tutor', label: 'AI Tutor', icon: Sparkles, admin: false },
-    { href: '/quizzes', label: 'Quiz', icon: ListChecks, admin: false },
-    { href: '/for-you', label: 'Homework', icon: NotebookPen, admin: false },
-    { href: '/conversations', label: 'Conversation', icon: MessageCircle, admin: false },
-    { href: '/scramble', label: 'Sentence Game', icon: Gamepad2, admin: false },
-    { href: '/review', label: 'Review', icon: GraduationCap, admin: false },
-    { href: '/writing', label: 'Practice Writing', icon: PenLine, admin: false },
-    { href: '/favorites', label: 'Favorites', icon: Heart, admin: false },
-    { href: '/progress', label: 'Progress', icon: ChartNoAxesColumnIncreasing, admin: false },
-    { href: '/classes', label: 'My Classes', icon: CalendarDays, admin: false },
-    { href: '/settings', label: 'Settings', icon: Settings, admin: false },
-    { href: '/admin/users', label: 'User List', icon: Users, admin: true },
+  const overflowItems: { href: string; key: NavKey; icon: any; admin: boolean }[] = [
+    { href: '/ai-tutor', key: 'aiTutor', icon: Sparkles, admin: false },
+    { href: '/quizzes', key: 'quiz', icon: ListChecks, admin: false },
+    { href: '/for-you', key: 'homework', icon: NotebookPen, admin: false },
+    { href: '/conversations', key: 'conversation', icon: MessageCircle, admin: false },
+    { href: '/scramble', key: 'sentenceGame', icon: Gamepad2, admin: false },
+    { href: '/review', key: 'review', icon: GraduationCap, admin: false },
+    { href: '/writing', key: 'practiceWriting', icon: PenLine, admin: false },
+    { href: '/favorites', key: 'favorites', icon: Heart, admin: false },
+    { href: '/progress', key: 'progress', icon: ChartNoAxesColumnIncreasing, admin: false },
+    { href: '/classes', key: 'myClasses', icon: CalendarDays, admin: false },
+    { href: '/settings', key: 'settings', icon: Settings, admin: false },
+    { href: '/admin/users', key: 'userList', icon: Users, admin: true },
   ];
 
   const notificationCount = (href: string) => {
@@ -306,18 +310,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     <aside className="fixed inset-y-0 hidden w-64 border-r border-stone-200 bg-white px-4 py-6 md:flex md:flex-col">
       <Link href="/dashboard" className="mb-9 flex shrink-0 items-center gap-3 px-2"><span className="grid size-9 place-items-center rounded-xl bg-[#b91c1c] text-lg text-white">汉</span><span className="font-semibold tracking-wide">CHINESE REVIEW</span></Link>
       <nav className="sidebar-scroll min-h-0 flex-1 space-y-1 overflow-y-scroll overscroll-contain pr-2 [scrollbar-gutter:stable]">
-        {navigation.map(({ href, label, icon: Icon, admin }) => { const count = notificationCount(href); return <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && isStaffLoaded && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{label}{count > 0 && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{count}</span>}</Link>; })}
+        {navigation.map(({ href, key, icon: Icon, admin }) => { const count = notificationCount(href); return <Link key={href} href={href} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-600 hover:bg-stone-100'} ${admin && isStaffLoaded && !isStaff ? 'hidden' : ''}`}><Icon size={18}/>{t.nav[key]}{count > 0 && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[11px] font-semibold leading-4 text-white">{count}</span>}</Link>; })}
         {isStaffLoaded && isStaff && <div className="pt-1">
-          <button type="button" onClick={() => setAdminMenuOpen((open) => !open)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${managementItems.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ? 'bg-amber-50 text-amber-800' : 'text-slate-700 hover:bg-stone-100'}`}><ShieldCheck size={18} />Management Admin<ChevronDown size={16} className={`ml-auto transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} /></button>
-          {adminMenuOpen && <div className="ml-4 mt-1 space-y-1 border-l-2 border-amber-200 pl-2">{managementItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-amber-100 font-semibold text-amber-900' : 'text-slate-600 hover:bg-stone-100'}`}><Icon size={16} />{label}</Link>)}</div>}
+          <button type="button" onClick={() => setAdminMenuOpen((open) => !open)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${managementItems.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ? 'bg-amber-50 text-amber-800' : 'text-slate-700 hover:bg-stone-100'}`}><ShieldCheck size={18} />{t.nav.managementAdmin}<ChevronDown size={16} className={`ml-auto transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} /></button>
+          {adminMenuOpen && <div className="ml-4 mt-1 space-y-1 border-l-2 border-amber-200 pl-2">{managementItems.map(({ href, key, icon: Icon }) => <Link key={href} href={href} className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-amber-100 font-semibold text-amber-900' : 'text-slate-600 hover:bg-stone-100'}`}><Icon size={16} />{t.nav[key]}</Link>)}</div>}
         </div>}
       </nav>
     </aside>
-    <main className="min-w-0 overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><Link href="/ai-tutor" aria-label="Open AI Tutor" title="AI Tutor" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-50 px-3 text-sm font-semibold text-[#b91c1c] transition hover:bg-red-100"><Sparkles size={17} /> AI Tutor</Link><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label="Log out" className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto min-w-0 max-w-7xl px-4 py-4 sm:p-6 md:p-8">{children}</div></main>
+    <main className="min-w-0 overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))] md:ml-64 md:pb-8"><header className="hidden h-16 items-center justify-end border-b border-stone-200 bg-white px-5 md:flex md:px-8"><div className="flex items-center gap-3"><div className="inline-flex items-center rounded-xl border border-stone-200 bg-stone-50 p-0.5 text-xs font-bold" role="group" aria-label={t.nav.language}><button type="button" onClick={() => setLang('en')} className={`rounded-lg px-2.5 py-1.5 transition ${lang === 'en' ? 'bg-white text-[#b91c1c] shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>EN</button><button type="button" onClick={() => setLang('kh')} className={`rounded-lg px-2.5 py-1.5 transition ${lang === 'kh' ? 'bg-white text-[#b91c1c] shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}>KH</button></div><Link href="/ai-tutor" aria-label="Open AI Tutor" title={t.nav.aiTutor} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-red-50 px-3 text-sm font-semibold text-[#b91c1c] transition hover:bg-red-100"><Sparkles size={17} /> {t.nav.aiTutor}</Link><span className="text-sm font-medium text-slate-700">{displayName}</span><button type="button" onClick={logout} aria-label={t.nav.signOut} className="rounded-lg p-2 text-slate-500 transition hover:bg-stone-100 hover:text-[#b91c1c]"><LogOut size={18}/></button></div></header><div className="mx-auto min-w-0 max-w-7xl px-4 py-4 sm:p-6 md:p-8">{children}</div></main>
     
     {/* Mobile bottom nav - 5 main items + menu */}
     <nav className="mobile-safe-nav fixed inset-x-0 bottom-0 z-10 flex items-center justify-between border-t border-stone-200 bg-white px-1 pt-2 md:hidden">
-      {mobileNavItems.map(({ href, label, icon: Icon }) => (
+      {mobileNavItems.map(({ href, key, icon: Icon }) => (
         <Link
           key={href}
           href={href}
@@ -325,8 +329,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-0.5 py-1 text-[10px] sm:px-2 sm:text-[11px] ${pathname === href ? 'text-[#b91c1c]' : 'text-slate-500'}`}
         >
           <Icon size={19} />
-          <span>
-            {label}
+          <span className="truncate max-w-full">
+            {t.nav[key]}
             {notificationCount(href) > 0 && <span className="ml-1 rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-white">{notificationCount(href)}</span>}
           </span>
         </Link>
@@ -337,7 +341,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label="More options"
       >
         <Menu size={19} />
-        <span>More</span>
+        <span>{t.nav.more}</span>
         {overflowNotificationCount > 0 && (
           <span className="absolute -top-1 -right-1 inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white">
             {overflowNotificationCount}
@@ -352,11 +356,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="absolute inset-0 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
         <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl p-4 animate-slide-up max-h-[80vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-lg">More</h3>
-            <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-lg hover:bg-stone-100"><X size={20} /></button>
+            <h3 className="font-semibold text-lg">{t.nav.more}</h3>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-xl border border-stone-200 bg-stone-50 p-0.5 text-xs font-bold" role="group" aria-label={t.nav.language}>
+                <button type="button" onClick={() => setLang('en')} className={`rounded-lg px-2.5 py-1 transition ${lang === 'en' ? 'bg-white text-[#b91c1c] shadow-xs' : 'text-slate-500'}`}>EN</button>
+                <button type="button" onClick={() => setLang('kh')} className={`rounded-lg px-2.5 py-1 transition ${lang === 'kh' ? 'bg-white text-[#b91c1c] shadow-xs' : 'text-slate-500'}`}>KH</button>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-lg hover:bg-stone-100"><X size={20} /></button>
+            </div>
           </div>
           <nav className="space-y-2">
-            {overflowItems.map(({ href, label, icon: Icon, admin }) => (
+            {overflowItems.map(({ href, key, icon: Icon, admin }) => (
               !admin || (isStaffLoaded && isStaff) ? (
                 <Link
                   key={href}
@@ -365,19 +375,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium ${pathname === href ? 'bg-red-50 text-[#b91c1c]' : 'text-slate-700 hover:bg-stone-100'}`}
                 >
                   <Icon size={20} />
-                  {label}
+                  {t.nav[key]}
                   {notificationCount(href) > 0 && <span className="ml-auto inline-flex min-w-5 justify-center rounded-full bg-[#b91c1c] px-2 py-1 text-xs font-semibold text-white">{notificationCount(href)}</span>}
                 </Link>
               ) : null
             ))}
             {isStaffLoaded && isStaff && <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-2">
-              <button type="button" onClick={() => setAdminMenuOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-semibold text-amber-900"><ShieldCheck size={20} />Management Admin<ChevronDown size={17} className={`ml-auto transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} /></button>
-              {adminMenuOpen && <div className="space-y-1">{managementItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-amber-200 text-amber-950' : 'text-slate-700 hover:bg-white'}`}><Icon size={18} />{label}</Link>)}</div>}
+              <button type="button" onClick={() => setAdminMenuOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-semibold text-amber-900"><ShieldCheck size={20} />{t.nav.managementAdmin}<ChevronDown size={17} className={`ml-auto transition-transform ${adminMenuOpen ? 'rotate-180' : ''}`} /></button>
+              {adminMenuOpen && <div className="space-y-1">{managementItems.map(({ href, key, icon: Icon }) => <Link key={href} href={href} onClick={() => setMobileMenuOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${pathname === href || pathname.startsWith(`${href}/`) ? 'bg-amber-200 text-amber-950' : 'text-slate-700 hover:bg-white'}`}><Icon size={18} />{t.nav[key]}</Link>)}</div>}
             </div>}
             <hr className="my-2 border-stone-200" />
             <button onClick={logout} className="flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium text-red-600 hover:bg-red-50 w-full">
               <LogOut size={20} />
-              Sign out
+              {t.nav.signOut}
             </button>
           </nav>
         </div>

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Upload, AlertCircle, CheckCircle, Loader2, X, Download, Eye, EyeOff, Sparkles } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle, Loader2, X, Download, Eye, EyeOff, Sparkles, Send } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,7 @@ import { todayISO } from "@/lib/schedule";
 import { parseCSV, parseExcel, mapWordRow, type WordImportRow, exportToExcel } from '@/lib/import';
 import { useToasts } from '@/components/ui/toast';
 import { fetchWordAutofill } from '@/lib/ai-autofill';
+import { sendTodayWordsTelegramAlert } from '@/lib/telegram';
 
 const wordSchema = z.object({
   chinese: z.string().min(1, "Chinese is required"),
@@ -40,6 +41,18 @@ const isWithinLast24Hours = (createdAt?: string | null) => {
   return now - time <= 24 * 60 * 60 * 1000 && now - time >= 0;
 };
 
+const isTodayLocal = (createdAt?: string | null) => {
+  if (!createdAt) return false;
+  const created = new Date(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  const now = new Date();
+  return (
+    created.getFullYear() === now.getFullYear() &&
+    created.getMonth() === now.getMonth() &&
+    created.getDate() === now.getDate()
+  );
+};
+
 export default function AdminWordsPage() {
   const [user, setUser] = useState<string | null>(null);
   const [access, setAccess] = useState<"checking" | "allowed" | "denied">("checking");
@@ -52,6 +65,8 @@ export default function AdminWordsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingWord, setEditingWord] = useState<any | null>(null);
   const [isAutofilling, setIsAutofilling] = useState(false);
+  const [submittingWordsToday, setSubmittingWordsToday] = useState(false);
+  const [telegramStatus, setTelegramStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Import state
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -152,6 +167,46 @@ export default function AdminWordsPage() {
       date: todayISO(),
     },
   });
+
+  const todayWords = useMemo(() => {
+    return words
+      .filter((word: any) => isTodayLocal(word.created_at) && word.chinese)
+      .slice()
+      .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [words]);
+
+  const handleSubmitWordsToday = async () => {
+    if (todayWords.length === 0) {
+      setTelegramStatus({ type: 'error', text: 'No words added today yet.' });
+      return;
+    }
+    setSubmittingWordsToday(true);
+    setTelegramStatus(null);
+    const dateLabel = new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date());
+
+    const result = await sendTodayWordsTelegramAlert({
+      dateLabel,
+      words: todayWords.map((w: any) => ({
+        chinese: w.chinese,
+        pinyin: w.pinyin || null,
+        khmer: w.khmer || null,
+      })),
+    });
+
+    setSubmittingWordsToday(false);
+    if (!result.ok) {
+      setTelegramStatus({ type: 'error', text: result.error || 'Failed to send Telegram group alert.' });
+      return;
+    }
+    setTelegramStatus({
+      type: 'success',
+      text: `Sent ${todayWords.length} word${todayWords.length === 1 ? '' : 's'} added today (${dateLabel}) to Telegram group.`,
+    });
+  };
 
   const filteredWords = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -675,6 +730,26 @@ const onWordUpdate = async (data: WordFormData) => {
               )}
             </Button>
             <Button
+              variant="outline"
+              type="button"
+              onClick={handleSubmitWordsToday}
+              disabled={submittingWordsToday || todayWords.length === 0}
+              className="min-h-11 w-full border-sky-200 bg-sky-50 px-4 text-sky-800 hover:bg-sky-100 sm:w-auto"
+              title="Send all words added today to Telegram group"
+            >
+              {submittingWordsToday ? (
+                <>
+                  <Loader2 size={16} className="animate-spin mr-1.5" />
+                  <span>Sending...</span>
+                </>
+              ) : (
+                <>
+                  <Send size={15} className="mr-1.5" />
+                  <span>Submit Words Today ({todayWords.length})</span>
+                </>
+              )}
+            </Button>
+            <Button
               variant="success"
               type="button"
               onClick={startAdd}
@@ -684,6 +759,30 @@ const onWordUpdate = async (data: WordFormData) => {
             </Button>
           </div>
         </div>
+
+        {telegramStatus && (
+          <div
+            role="status"
+            className={`mb-4 flex items-center justify-between gap-3 rounded-xl border p-3 text-sm ${
+              telegramStatus.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {telegramStatus.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              <span>{telegramStatus.text}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTelegramStatus(null)}
+              className="rounded p-1 hover:bg-black/5"
+              aria-label="Dismiss"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {isEditing && (
           <Card className="w-full max-w-2xl overflow-hidden rounded-2xl p-4 sm:p-6">

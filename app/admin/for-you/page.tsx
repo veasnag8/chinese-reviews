@@ -1,8 +1,9 @@
 'use client';
 
 import { ClipboardEvent, FormEvent, useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ClipboardPaste, Clock3, ImageIcon, Loader2, NotebookPen, Pencil, Plus, RotateCcw, Send, Trash2, Upload, X } from 'lucide-react';
+import { BellRing, CheckCircle2, ClipboardPaste, Clock3, ImageIcon, Loader2, NotebookPen, Pencil, Plus, RotateCcw, Send, Trash2, Upload, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { sendHomeworkTelegramAlert } from '@/lib/telegram';
 
 type Assignment = {
   id: string;
@@ -59,6 +60,8 @@ export default function AdminForYouPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [saving, setSaving] = useState(false);
+  const [alertingId, setAlertingId] = useState<string | null>(null);
+  const [alertedIds, setAlertedIds] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState('');
   const [promptImage, setPromptImage] = useState<File | null>(null);
 
@@ -207,6 +210,24 @@ export default function AdminForYouPage() {
       await loadAssignments();
     }
     setSaving(false);
+  };
+
+  const alertGroupHomework = async (assignment: Assignment) => {
+    setAlertingId(assignment.id);
+    setMessage('');
+    const result = await sendHomeworkTelegramAlert({
+      assignmentId: assignment.id,
+      title: assignment.title,
+      description: assignment.description,
+      expiresAt: assignment.expires_at,
+    });
+    setAlertingId(null);
+    if (!result.ok) {
+      setMessage(result.error || 'Failed to send Telegram group alert.');
+      return;
+    }
+    setAlertedIds((current) => ({ ...current, [assignment.id]: true }));
+    setMessage(`Telegram group alerted for "${assignment.title}".`);
   };
 
   const deleteAssignment = async (assignment: Assignment) => {
@@ -407,9 +428,29 @@ export default function AdminForYouPage() {
                 <h3 className="line-clamp-1 text-lg font-bold text-slate-900">{assignment.title}</h3>
                 <p className="mt-1 line-clamp-2 min-h-10 text-sm text-slate-500">{assignment.description || 'No description'}</p>
                 <div className="mt-3 flex items-start gap-2 text-xs text-slate-500"><Clock3 className="mt-0.5 shrink-0" size={15} /><span>{formatDate(assignment.starts_at)}<br />to {formatDate(assignment.expires_at)}</span></div>
-                <div className="mt-4 flex gap-2 border-t border-stone-100 pt-3">
-                  <button type="button" onClick={(event) => { event.stopPropagation(); openEditForm(assignment); }} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-stone-200 px-3 text-sm font-semibold text-slate-700 hover:bg-stone-50"><Pencil size={15} /> Edit</button>
-                  <button type="button" onClick={(event) => { event.stopPropagation(); void deleteAssignment(assignment); }} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"><Trash2 size={15} /> Delete</button>
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-stone-100 pt-3">
+                  <button
+                    type="button"
+                    disabled={alertingId === assignment.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void alertGroupHomework(assignment);
+                    }}
+                    className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    {alertingId === assignment.id ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <BellRing size={15} />
+                    )}
+                    {alertingId === assignment.id
+                      ? 'Sending...'
+                      : alertedIds[assignment.id]
+                        ? 'Alerted ✓'
+                        : 'Alert Group'}
+                  </button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); openEditForm(assignment); }} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-stone-200 px-3 text-sm font-semibold text-slate-700 hover:bg-stone-50"><Pencil size={15} /> Edit</button>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); void deleteAssignment(assignment); }} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 text-sm font-semibold text-white hover:bg-red-700"><Trash2 size={15} /> Delete</button>
                 </div>
               </div>
             </article>;

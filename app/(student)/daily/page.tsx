@@ -5,10 +5,12 @@ import Link from "next/link";
 import { CalendarDays, FileText, Languages, PenLine, Volume2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { speakChinese as speak } from "@/lib/speech";
+import { useLanguage } from "@/lib/i18n";
 
 type Lesson = { id: string; name: string; date: string; description?: string | null; teacher?: string | null };
 
 export default function DailyPage() {
+  const { t } = useLanguage();
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [lessonId, setLessonId] = useState("");
   const [words, setWords] = useState<any[]>([]);
@@ -42,17 +44,17 @@ export default function DailyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Daily lesson</p>
-        <h1 className="mt-1 text-3xl font-bold">What I learned today</h1>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{t.daily.eyebrow}</p>
+        <h1 className="mt-1 text-3xl font-bold">{t.daily.title}</h1>
       </div>
       <label className="block max-w-xl text-sm font-semibold">
-        Lesson date
+        {t.daily.lessonDate}
         <select
           value={lessonId}
           onChange={(event) => setLessonId(event.target.value)}
           className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-3 font-normal"
         >
-          <option value="">Select a lesson date</option>
+          <option value="">{t.daily.selectDate}</option>
           {lessons.map((lesson) => (
             <option key={lesson.id} value={lesson.id}>
               {lesson.date} — {lesson.name}
@@ -63,7 +65,7 @@ export default function DailyPage() {
 
       {!selectedLesson ? (
         <p className="rounded-xl border border-dashed border-stone-300 p-8 text-center text-slate-500">
-          No lesson schedules yet.
+          {t.daily.noSchedules}
         </p>
       ) : (
         <>
@@ -81,7 +83,7 @@ export default function DailyPage() {
             <section className="rounded-2xl border border-stone-200 bg-white p-5">
               <h2 className="flex items-center gap-2 text-lg font-bold">
                 <Languages size={20} className="text-[#b91c1c]" />
-                Words
+                {t.daily.words}
               </h2>
               <div className="mt-4 space-y-3">
                 {words.length ? (
@@ -109,12 +111,12 @@ export default function DailyPage() {
                         href={`/writing?word=${encodeURIComponent(word.id)}`}
                         className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#b91c1c] hover:underline"
                       >
-                        <PenLine size={14} /> Practice
+                        <PenLine size={14} /> {t.daily.practice}
                       </Link>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500">No words for this date.</p>
+                  <p className="text-sm text-slate-500">{t.daily.noWordsDate}</p>
                 )}
               </div>
             </section>
@@ -122,7 +124,7 @@ export default function DailyPage() {
             <section className="rounded-2xl border border-stone-200 bg-white p-5">
               <h2 className="flex items-center gap-2 text-lg font-bold">
                 <FileText size={20} className="text-[#b91c1c]" />
-                Sentences
+                {t.daily.sentences}
               </h2>
               <div className="mt-4 space-y-3">
                 {sentences.length ? (
@@ -151,7 +153,7 @@ export default function DailyPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500">No sentences for this date.</p>
+                  <p className="text-sm text-slate-500">{t.daily.noSentencesDate}</p>
                 )}
               </div>
             </section>
