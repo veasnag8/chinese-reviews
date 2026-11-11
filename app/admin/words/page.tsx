@@ -284,13 +284,43 @@ const getOrCreateClass = async (name: string, date: string, lessonNumberStr?: st
     return null;
   };
 
+  const resolveBackgroundWordMetadata = async (data: WordFormData): Promise<WordFormData> => {
+    const needsCategory = !data.category?.trim();
+    const needsPartOfSpeech = !data.partOfSpeech?.trim();
+    const needsExample = !data.exampleSentence?.trim();
+    if ((!needsCategory && !needsPartOfSpeech && !needsExample) || !data.chinese?.trim()) {
+      return data;
+    }
+
+    try {
+      const res = await fetchWordAutofill(data.chinese.trim());
+      const ai = res.data;
+      if (!ai) return data;
+      return {
+        ...data,
+        pinyin: data.pinyin?.trim() ? data.pinyin : ai.pinyin || data.pinyin,
+        khmer: data.khmer?.trim() ? data.khmer : ai.khmer || data.khmer,
+        english: data.english?.trim() ? data.english : ai.english || data.english,
+        category: data.category?.trim() ? data.category : ai.category || data.category,
+        partOfSpeech: data.partOfSpeech?.trim() ? data.partOfSpeech : ai.partOfSpeech || data.partOfSpeech,
+        exampleSentence: data.exampleSentence?.trim() ? data.exampleSentence : ai.exampleSentence || data.exampleSentence,
+        examplePinyin: data.examplePinyin?.trim() ? data.examplePinyin : ai.examplePinyin || data.examplePinyin,
+        exampleKhmer: data.exampleKhmer?.trim() ? data.exampleKhmer : ai.exampleKhmer || data.exampleKhmer,
+      };
+    } catch {
+      return data;
+    }
+  };
+
   const onWordSubmit = async (data: WordFormData) => {
     if (!user) return;
 
     setFormState("submitting");
     setErrorMessage("");
 
-    const classResult = await getOrCreateClass(data.className, data.date, data.lessonNumber);
+    const enriched = await resolveBackgroundWordMetadata(data);
+
+    const classResult = await getOrCreateClass(enriched.className, enriched.date, enriched.lessonNumber);
     if (classResult.error) {
       setErrorMessage(classResult.error);
       setFormState("error");
@@ -300,15 +330,15 @@ const getOrCreateClass = async (name: string, date: string, lessonNumberStr?: st
     const { error } = await supabase
       .from("words")
       .insert({
-        chinese: data.chinese,
-        pinyin: data.pinyin,
-        khmer: data.khmer,
-        english: data.english,
-        part_of_speech: data.partOfSpeech,
-        example_sentence: data.exampleSentence,
-        example_pinyin: data.examplePinyin,
-        example_khmer: data.exampleKhmer,
-        category: data.category,
+        chinese: enriched.chinese,
+        pinyin: enriched.pinyin,
+        khmer: enriched.khmer,
+        english: enriched.english,
+        part_of_speech: enriched.partOfSpeech,
+        example_sentence: enriched.exampleSentence,
+        example_pinyin: enriched.examplePinyin,
+        example_khmer: enriched.exampleKhmer,
+        category: enriched.category,
         class_id: classResult.id,
         user_id: user,
       } as any);
@@ -333,7 +363,9 @@ const onWordUpdate = async (data: WordFormData) => {
     setFormState("submitting");
     setErrorMessage("");
 
-    const classResult = await getOrCreateClass(data.className, data.date, data.lessonNumber);
+    const enriched = await resolveBackgroundWordMetadata(data);
+
+    const classResult = await getOrCreateClass(enriched.className, enriched.date, enriched.lessonNumber);
     if (classResult.error) {
       setErrorMessage(classResult.error);
       setFormState("error");
@@ -342,15 +374,15 @@ const onWordUpdate = async (data: WordFormData) => {
 
     const { error } = await (supabase.from("words") as any)
       .update({
-        chinese: data.chinese,
-        pinyin: data.pinyin,
-        khmer: data.khmer,
-        english: data.english,
-        part_of_speech: data.partOfSpeech,
-        example_sentence: data.exampleSentence,
-        example_pinyin: data.examplePinyin,
-        example_khmer: data.exampleKhmer,
-        category: data.category,
+        chinese: enriched.chinese,
+        pinyin: enriched.pinyin,
+        khmer: enriched.khmer,
+        english: enriched.english,
+        part_of_speech: enriched.partOfSpeech,
+        example_sentence: enriched.exampleSentence,
+        example_pinyin: enriched.examplePinyin,
+        example_khmer: enriched.exampleKhmer,
+        category: enriched.category,
         class_id: classResult.id,
         updated_at: new Date().toISOString(),
       })
@@ -946,30 +978,11 @@ const onWordUpdate = async (data: WordFormData) => {
                 </div>
               </div>
 
-              <div className="word-form-grid gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Category
-                  </label>
-
-                  <Input
-                    placeholder="Enter category"
-                    className="min-h-11 text-base sm:text-sm"
-                    {...register("category")}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Part of Speech
-                  </label>
-
-                  <Input
-                    placeholder="e.g., noun, verb"
-                    className="min-h-11 text-base sm:text-sm"
-                    {...register("partOfSpeech")}
-                  />
-                </div>
-              </div>
+              <input type="hidden" {...register("category")} />
+              <input type="hidden" {...register("partOfSpeech")} />
+              <input type="hidden" {...register("exampleSentence")} />
+              <input type="hidden" {...register("examplePinyin")} />
+              <input type="hidden" {...register("exampleKhmer")} />
 
               <div className="word-action-grid gap-2 pt-1 sm:flex">
                 <Button
