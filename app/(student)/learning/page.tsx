@@ -9,7 +9,8 @@ import { useLanguage } from '@/lib/i18n';
 import {
   classifySentenceLesson,
   classifyWordLesson,
-  LESSON_ORDER,
+  CORE_LESSONS,
+  sortLessonKeys,
   type LessonKey,
 } from '@/lib/lessons';
 
@@ -179,7 +180,7 @@ export default function LearningPage() {
             className: cls?.name || 'Outside Words',
             classId: w.class_id || 'unassigned',
             classDate: cls?.date || '',
-            lessonKey: classifyWordLesson(w.chinese),
+            lessonKey: classifyWordLesson(w.chinese, cls?.lesson_number ?? null),
           };
         });
 
@@ -215,9 +216,15 @@ export default function LearningPage() {
         initClasses['Outside Words'] = true;
       }
       Object.keys(initClasses).forEach((clsName) => {
-        LESSON_ORDER.forEach((lessonKey) => {
+        [...CORE_LESSONS, 'Outside Words' as LessonKey].forEach((lessonKey) => {
           initLessons[`${clsName}::${lessonKey}`] = true;
         });
+      });
+      mappedWords.forEach((w) => {
+        initLessons[`${w.className}::${w.lessonKey}`] = true;
+      });
+      mappedSentences.forEach((s) => {
+        initLessons[`${s.className}::${s.lessonKey}`] = true;
       });
 
       setExpandedClasses(initClasses);
@@ -248,7 +255,12 @@ export default function LearningPage() {
       classWords.forEach((w) => dateIds.add(w.classId));
       classSentences.forEach((s) => dateIds.add(s.classId));
 
-      const lessons: LessonTaskGroup[] = LESSON_ORDER.map((lessonKey) => {
+      const lessonKeys = sortLessonKeys([
+        ...CORE_LESSONS,
+        ...classWords.map((w) => w.lessonKey),
+        ...classSentences.map((s) => s.lessonKey),
+      ]);
+      const lessons: LessonTaskGroup[] = lessonKeys.map((lessonKey) => {
         const lessonWords = classWords.filter((w) => w.lessonKey === lessonKey);
         const lessonSentences = classSentences.filter((s) => s.lessonKey === lessonKey);
 
@@ -654,10 +666,15 @@ export default function LearningPage() {
   };
 
   const lessonDisplayName = (key: LessonKey) => {
+    if (key === 'Outside Words') return t.learning.outsideWords;
     if (key === 'Lesson 1') return t.learning.lesson1;
     if (key === 'Lesson 2') return t.learning.lesson2;
     if (key === 'Lesson 3') return t.learning.lesson3;
-    return t.learning.outsideWords;
+    const match = key.match(/^Lesson (\d+)$/);
+    if (match && lang === 'kh') {
+      return `មេរៀនទី ${match[1]} (${key})`;
+    }
+    return key;
   };
 
   if (loading) {

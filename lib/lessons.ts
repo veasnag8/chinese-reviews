@@ -1,11 +1,6 @@
-export type LessonKey = 'Lesson 1' | 'Lesson 2' | 'Lesson 3' | 'Outside Words';
+export type LessonKey = `Lesson ${number}` | 'Outside Words';
 
-export const LESSON_ORDER: LessonKey[] = [
-  'Lesson 1',
-  'Lesson 2',
-  'Lesson 3',
-  'Outside Words',
-];
+export const CORE_LESSONS: LessonKey[] = ['Lesson 1', 'Lesson 2', 'Lesson 3'];
 
 export const LESSON_1_WORDS = [
   '你',
@@ -68,9 +63,17 @@ function normalizeChinese(text: string): string {
 }
 
 /**
- * Classifies a Chinese vocabulary word into Lesson 1, Lesson 2, Lesson 3, or Outside Words.
+ * Classifies a Chinese vocabulary word into Lesson N (when class lesson_number is provided),
+ * otherwise matches Lessons 1-3 vocabulary or falls back to Outside Words.
  */
-export function classifyWordLesson(chinese: string): LessonKey {
+export function classifyWordLesson(
+  chinese: string,
+  lessonNumber?: number | null
+): LessonKey {
+  if (typeof lessonNumber === 'number' && lessonNumber >= 1) {
+    return `Lesson ${lessonNumber}`;
+  }
+
   const clean = normalizeChinese(chinese);
   if (LESSON_1_SET.has(clean)) return 'Lesson 1';
   if (LESSON_2_SET.has(clean)) return 'Lesson 2';
@@ -79,16 +82,16 @@ export function classifyWordLesson(chinese: string): LessonKey {
 }
 
 /**
- * Classifies a Chinese sentence into Lesson 1, Lesson 2, Lesson 3, or Outside Words.
- * Uses class lesson_number when provided (1-3), otherwise matches against the highest lesson vocabulary in the sentence.
+ * Classifies a Chinese sentence into Lesson N (when class lesson_number is provided),
+ * otherwise matches against the highest lesson vocabulary in the sentence.
  */
 export function classifySentenceLesson(
   chineseSentence: string,
   lessonNumber?: number | null
 ): LessonKey {
-  if (lessonNumber === 1) return 'Lesson 1';
-  if (lessonNumber === 2) return 'Lesson 2';
-  if (lessonNumber === 3) return 'Lesson 3';
+  if (typeof lessonNumber === 'number' && lessonNumber >= 1) {
+    return `Lesson ${lessonNumber}`;
+  }
 
   const clean = normalizeChinese(chineseSentence);
   if (!clean) return 'Outside Words';
@@ -97,4 +100,18 @@ export function classifySentenceLesson(
   if (LESSON_2_WORDS.some((w) => clean.includes(w))) return 'Lesson 2';
   if (LESSON_1_WORDS.some((w) => clean.includes(w))) return 'Lesson 1';
   return 'Outside Words';
+}
+
+/**
+ * Sorts lesson keys as Lesson 1, Lesson 2, ..., Lesson N, followed by Outside Words.
+ */
+export function sortLessonKeys(keys: Iterable<LessonKey>): LessonKey[] {
+  const unique = Array.from(new Set(keys));
+  return unique.sort((a, b) => {
+    if (a === 'Outside Words') return 1;
+    if (b === 'Outside Words') return -1;
+    const numA = Number(a.replace('Lesson ', ''));
+    const numB = Number(b.replace('Lesson ', ''));
+    return numA - numB;
+  });
 }

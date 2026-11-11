@@ -28,6 +28,7 @@ const wordSchema = z.object({
   exampleKhmer: z.string().optional(),
   category: z.string().optional(),
   className: z.string().min(1, "Class is required"),
+  lessonNumber: z.string().optional(),
   date: z.string().min(1, "Lesson date is required"),
 });
 
@@ -141,7 +142,7 @@ export default function AdminWordsPage() {
       .from("words")
       .select(`
         *,
-        classes!words_class_id_fkey (name, date)
+        classes!words_class_id_fkey (name, date, lesson_number)
       `)
       .order("created_at", { ascending: false });
 
@@ -164,6 +165,7 @@ export default function AdminWordsPage() {
     resolver: zodResolver(wordSchema),
     defaultValues: {
       className: "",
+      lessonNumber: "",
       date: todayISO(),
     },
   });
@@ -221,15 +223,25 @@ export default function AdminWordsPage() {
     );
   }, [search, words]);
 
-const getOrCreateClass = async (name: string, date: string) => {
+const getOrCreateClass = async (name: string, date: string, lessonNumberStr?: string) => {
     if (!supabase) return { id: null, error: 'Supabase not configured' };
 
-    const { data: existing } = await supabase
+    const parsedLesson = lessonNumberStr && lessonNumberStr.trim() ? Number(lessonNumberStr) : null;
+    const lessonNumber = parsedLesson !== null && Number.isFinite(parsedLesson) && parsedLesson >= 1 ? parsedLesson : null;
+
+    let query = supabase
       .from('classes')
       .select('id')
       .eq('name', name)
-      .eq('date', date)
-      .maybeSingle();
+      .eq('date', date);
+
+    if (lessonNumber !== null) {
+      query = query.eq('lesson_number', lessonNumber);
+    } else {
+      query = query.is('lesson_number', null);
+    }
+
+    const { data: existing } = await query.limit(1).maybeSingle();
 
     if (existing && typeof existing === 'object' && 'id' in existing) {
       return { id: (existing as { id: string }).id };
@@ -240,7 +252,12 @@ const getOrCreateClass = async (name: string, date: string) => {
 
     const { data: created, error } = await supabase
       .from('classes')
-      .insert({ name, date, user_id: auth.user.id } as any)
+      .insert({
+        name,
+        date,
+        lesson_number: lessonNumber,
+        user_id: auth.user.id,
+      } as any)
       .select('id')
       .single();
 
@@ -273,7 +290,7 @@ const getOrCreateClass = async (name: string, date: string) => {
     setFormState("submitting");
     setErrorMessage("");
 
-    const classResult = await getOrCreateClass(data.className, data.date);
+    const classResult = await getOrCreateClass(data.className, data.date, data.lessonNumber);
     if (classResult.error) {
       setErrorMessage(classResult.error);
       setFormState("error");
@@ -316,7 +333,7 @@ const onWordUpdate = async (data: WordFormData) => {
     setFormState("submitting");
     setErrorMessage("");
 
-    const classResult = await getOrCreateClass(data.className, data.date);
+    const classResult = await getOrCreateClass(data.className, data.date, data.lessonNumber);
     if (classResult.error) {
       setErrorMessage(classResult.error);
       setFormState("error");
@@ -540,7 +557,7 @@ const onWordUpdate = async (data: WordFormData) => {
     setEditingWord(null);
     setIsEditing(true);
     setFormState("idle");
-    reset({ className: "", date: todayISO() });
+    reset({ className: "", lessonNumber: "", date: todayISO() });
   };
 
   const startEdit = (word: any) => {
@@ -558,6 +575,7 @@ const onWordUpdate = async (data: WordFormData) => {
       exampleKhmer: word.example_khmer || "",
       category: word.category || "",
       className: word.classes?.name || "",
+      lessonNumber: word.classes?.lesson_number ? String(word.classes.lesson_number) : "",
       date: word.classes?.date || todayISO(),
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -892,6 +910,29 @@ const onWordUpdate = async (data: WordFormData) => {
               <div className="word-form-grid gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
+                    Lesson
+                  </label>
+                  <Select
+                    className="min-h-11 text-base sm:text-sm"
+                    value={watch("lessonNumber") || ""}
+                    options={[
+                      { value: "", label: "Other / Outside Words (Auto)" },
+                      ...Array.from({ length: 20 }, (_, idx) => ({
+                        value: String(idx + 1),
+                        label: `Lesson ${idx + 1}`,
+                      })),
+                    ]}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setValue("lessonNumber", value || "");
+                    }}
+                  />
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                    Choose Lesson 1, 2, 3... or leave as Other / Outside Words.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
                     Lesson Date
                   </label>
                   <Input
@@ -900,9 +941,12 @@ const onWordUpdate = async (data: WordFormData) => {
                     {...register("date")}
                   />
                   <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                    Used with Class to group this word.
+                    Used with Class &amp; Lesson to group this word.
                   </p>
                 </div>
+              </div>
+
+              <div className="word-form-grid gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Category
@@ -914,18 +958,17 @@ const onWordUpdate = async (data: WordFormData) => {
                     {...register("category")}
                   />
                 </div>
-              </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Part of Speech
+                  </label>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Part of Speech
-                </label>
-
-                <Input
-                  placeholder="e.g., noun, verb"
-                  className="min-h-11 text-base sm:text-sm"
-                  {...register("partOfSpeech")}
-                />
+                  <Input
+                    placeholder="e.g., noun, verb"
+                    className="min-h-11 text-base sm:text-sm"
+                    {...register("partOfSpeech")}
+                  />
+                </div>
               </div>
 
               <div className="word-action-grid gap-2 pt-1 sm:flex">
@@ -1083,10 +1126,19 @@ const onWordUpdate = async (data: WordFormData) => {
                       </td>
 
                       <td className="p-3">
-                        {word.classes?.name ||
-                          word.classes?.date ||
-                          word.class_name ||
-                          "—"}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>
+                            {word.classes?.name ||
+                              word.classes?.date ||
+                              word.class_name ||
+                              "—"}
+                          </span>
+                          {word.classes?.lesson_number && (
+                            <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
+                              Lesson {word.classes.lesson_number}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-3 flex gap-2">
