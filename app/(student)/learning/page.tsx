@@ -76,44 +76,14 @@ type ActiveSession = {
 
 type LearningStep = 'select-date' | 'preview' | 'teach-words' | 'practice-writing' | 'speak-word' | 'show-sentences' | 'complete';
 
-const LESSON_THEME: Record<
-  LessonKey,
-  {
-    card: string;
-    header: string;
-    icon: string;
-    badge: string;
-    connector: string;
-  }
-> = {
-  'Lesson 1': {
-    card: 'border-sky-200/80 bg-sky-50/50',
-    header: 'bg-sky-50/90',
-    icon: 'border-sky-200 bg-sky-100 text-sky-700',
-    badge: 'bg-sky-100 text-sky-800',
-    connector: 'border-sky-200',
-  },
-  'Lesson 2': {
-    card: 'border-emerald-200/80 bg-emerald-50/50',
-    header: 'bg-emerald-50/90',
-    icon: 'border-emerald-200 bg-emerald-100 text-emerald-700',
-    badge: 'bg-emerald-100 text-emerald-800',
-    connector: 'border-emerald-200',
-  },
-  'Lesson 3': {
-    card: 'border-violet-200/80 bg-violet-50/50',
-    header: 'bg-violet-50/90',
-    icon: 'border-violet-200 bg-violet-100 text-violet-700',
-    badge: 'bg-violet-100 text-violet-800',
-    connector: 'border-violet-200',
-  },
-  'Outside Words': {
-    card: 'border-amber-200/80 bg-amber-50/50',
-    header: 'bg-amber-50/90',
-    icon: 'border-amber-200 bg-amber-100 text-amber-700',
-    badge: 'bg-amber-100 text-amber-800',
-    connector: 'border-amber-200',
-  },
+const UNIFIED_LESSON_THEME = {
+  card: 'border-sky-200/80 bg-sky-50/70',
+  header: 'bg-sky-50/90',
+  icon: 'border-sky-200 bg-sky-100 text-sky-700',
+  badge: 'bg-sky-100 text-sky-800',
+  subtaskContainer: 'border-t border-slate-200/80 bg-slate-50/90 px-4 py-3',
+  connector: 'border-slate-300',
+  subtaskCard: 'border-slate-200/90 bg-slate-100/90 hover:border-slate-300 hover:bg-slate-100',
 };
 
 type SpeechRecognitionInstance = {
@@ -780,7 +750,7 @@ export default function LearningPage() {
                       const isLessonExpanded = expandedLessons[lessonExpandKey] ?? true;
                       const isOutside = lesson.lessonKey === 'Outside Words';
                       const hasItems = lesson.words.length > 0 || lesson.sentences.length > 0;
-                      const theme = LESSON_THEME[lesson.lessonKey];
+                      const theme = UNIFIED_LESSON_THEME;
                       const lessonLabel = lessonDisplayName(lesson.lessonKey);
 
                       return (
@@ -885,12 +855,12 @@ export default function LearningPage() {
 
                           {/* Level 3: Date Subtasks under Lesson */}
                           {isLessonExpanded && lesson.dates.length > 0 && (
-                            <div className="border-t border-stone-200/70 bg-white/75 px-4 py-3">
+                            <div className={theme.subtaskContainer}>
                               <div className={`relative space-y-2 border-l-2 pl-4 ${theme.connector}`}>
                                 {lesson.dates.map((dateItem) => (
                                   <div
                                     key={`${lesson.lessonKey}-${dateItem.classId}`}
-                                    className="relative flex flex-col gap-2.5 rounded-xl border border-stone-200/90 bg-white p-3 shadow-2xs transition hover:border-red-200 hover:bg-rose-50/30 sm:flex-row sm:items-center sm:justify-between"
+                                    className={`relative flex flex-col gap-2.5 rounded-xl border p-3 shadow-2xs transition sm:flex-row sm:items-center sm:justify-between ${theme.subtaskCard}`}
                                   >
                                     <span
                                       aria-hidden="true"
