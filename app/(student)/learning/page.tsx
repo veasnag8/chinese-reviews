@@ -2,9 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Volume2, ChevronRight, ChevronDown, Check, X, Sparkles, RotateCcw, Mic, MicOff, ArrowLeft, BookOpen, Calendar, Eye, Play } from 'lucide-react';
+import { Volume2, ChevronRight, ChevronDown, Check, X, Sparkles, RotateCcw, Mic, MicOff, ArrowLeft, BookOpen, Calendar, Eye, Play, GraduationCap, Layers } from 'lucide-react';
 import HanziWriter from 'hanzi-writer';
 import { speakChinese as speak } from '@/lib/speech';
+import {
+  classifySentenceLesson,
+  classifyWordLesson,
+  LESSON_ORDER,
+  type LessonKey,
+} from '@/lib/lessons';
 
 type LearningWord = {
   id: string;
@@ -15,6 +21,7 @@ type LearningWord = {
   className: string;
   classId: string;
   classDate: string;
+  lessonKey: LessonKey;
 };
 
 type LearningSentence = {
@@ -23,24 +30,47 @@ type LearningSentence = {
   pinyin: string;
   khmer: string;
   english: string;
+  className: string;
   classId: string;
+  classDate: string;
+  lessonKey: LessonKey;
 };
 
-type ClassOption = {
+type ClassRow = {
   id: string;
-  name: string;
+  name: string | null;
+  date: string | null;
+  lesson_number?: number | null;
+  description?: string | null;
+};
+
+type LessonDateSubtask = {
+  classId: string;
   date: string;
   lessonNumber: number | null;
   description: string | null;
-  wordCount: number;
-  sentenceCount: number;
+  words: LearningWord[];
+  sentences: LearningSentence[];
 };
 
-type LessonGroup = {
-  name: string;
-  dates: ClassOption[];
+type LessonTaskGroup = {
+  lessonKey: LessonKey;
+  words: LearningWord[];
+  sentences: LearningSentence[];
+  dates: LessonDateSubtask[];
+};
+
+type ClassTaskGroup = {
+  className: string;
+  lessons: LessonTaskGroup[];
   totalWords: number;
   totalSentences: number;
+  totalDates: number;
+};
+
+type ActiveSession = {
+  title: string;
+  subtitle: string;
 };
 
 type LearningStep = 'select-date' | 'preview' | 'teach-words' | 'practice-writing' | 'speak-word' | 'show-sentences' | 'complete';
@@ -57,11 +87,12 @@ type SpeechRecognitionInstance = {
 };
 
 export default function LearningPage() {
-  const [classes, setClasses] = useState<ClassOption[]>([]);
-  const [selectedClass, setSelectedClass] = useState<ClassOption | null>(null);
+  const [classRows, setClassRows] = useState<ClassRow[]>([]);
+  const [allWords, setAllWords] = useState<LearningWord[]>([]);
+  const [allSentences, setAllSentences] = useState<LearningSentence[]>([]);
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [expandedClasses, setExpandedClasses] = useState<Record<string, boolean>>({});
   const [expandedLessons, setExpandedLessons] = useState<Record<string, boolean>>({});
-  const [contentLoading, setContentLoading] = useState(false);
-  const pendingStepRef = useRef<'preview' | 'learn'>('learn');
   const [words, setWords] = useState<LearningWord[]>([]);
   const [sentences, setSentences] = useState<LearningSentence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +123,7 @@ export default function LearningPage() {
   const [charIndex, setCharIndex] = useState(0);
 
   useEffect(() => {
-    const loadClasses = async () => {
+    const loadLearningData = async () => {
       if (!supabase) {
         setLoading(false);
         return;
@@ -104,149 +135,172 @@ export default function LearningPage() {
         return;
       }
 
-      const { data: classData } = await supabase
-        .from('classes')
-        .select('id, name, date, lesson_number, description')
-        .order('date', { ascending: false });
-
-      if (!classData || classData.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      type ClassRow = {
-        id: string;
-        name: string | null;
-        date: string | null;
-        lesson_number?: number | null;
-        description?: string | null;
-      };
-
-      const classesWithCounts = await Promise.all(
-        (classData as ClassRow[]).map(async (c) => {
-          const [wordsRes, sentencesRes] = await Promise.all([
-            supabase.from('words').select('id', { count: 'exact', head: true }).eq('class_id', c.id),
-            supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('class_id', c.id),
-          ]);
-          return {
-            id: c.id,
-            name: c.name || 'Unnamed Lesson',
-            date: c.date || '',
-            lessonNumber: c.lesson_number ?? null,
-            description: c.description ?? null,
-            wordCount: wordsRes.count || 0,
-            sentenceCount: sentencesRes.count || 0,
-          };
-        })
-      );
-
-      const activeClasses = classesWithCounts.filter(c => c.wordCount > 0 || c.sentenceCount > 0);
-      setClasses(activeClasses);
-
-      const initialExpanded: Record<string, boolean> = {};
-      activeClasses.forEach((c) => {
-        const key = c.name || 'Unnamed Lesson';
-        initialExpanded[key] = true;
-      });
-      setExpandedLessons(initialExpanded);
-      setLoading(false);
-    };
-
-    loadClasses();
-  }, []);
-
-  const groupedLessons = useMemo<LessonGroup[]>(() => {
-    const map = new Map<string, ClassOption[]>();
-    classes.forEach((cls) => {
-      const key = cls.name || 'Unnamed Lesson';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(cls);
-    });
-
-    return Array.from(map.entries()).map(([name, dates]) => {
-      const sortedDates = [...dates].sort((a, b) => {
-        const timeA = a.date ? new Date(a.date).getTime() : 0;
-        const timeB = b.date ? new Date(b.date).getTime() : 0;
-        return timeB - timeA;
-      });
-      return {
-        name,
-        dates: sortedDates,
-        totalWords: sortedDates.reduce((sum, d) => sum + d.wordCount, 0),
-        totalSentences: sortedDates.reduce((sum, d) => sum + d.sentenceCount, 0),
-      };
-    });
-  }, [classes]);
-
-  useEffect(() => {
-    if (!selectedClass || !supabase) return;
-
-    const loadContent = async () => {
-      setContentLoading(true);
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) {
-        setContentLoading(false);
-        return;
-      }
-
-      const [wordsRes, sentencesRes] = await Promise.all([
+      const [classesRes, wordsRes, sentencesRes] = await Promise.all([
+        supabase
+          .from('classes')
+          .select('id, name, date, lesson_number, description')
+          .order('date', { ascending: false }),
         supabase
           .from('words')
-          .select('id, chinese, pinyin, khmer, english, class_id, classes!words_class_id_fkey (name, date)')
-          .eq('class_id', selectedClass.id)
+          .select('id, chinese, pinyin, khmer, english, class_id, created_at')
           .order('created_at', { ascending: true }),
         supabase
           .from('sentences')
-          .select('id, chinese_sentence, pinyin, khmer_translation, english_translation, class_id')
-          .eq('class_id', selectedClass.id)
+          .select('id, chinese_sentence, pinyin, khmer_translation, english_translation, class_id, created_at')
           .order('created_at', { ascending: true }),
       ]);
 
+      const fetchedClasses = (classesRes.data || []) as ClassRow[];
+      const classById = new Map<string, ClassRow>();
+      fetchedClasses.forEach((c) => classById.set(c.id, c));
+
       const mappedWords: LearningWord[] = ((wordsRes.data || []) as any[])
         .filter((w) => w.chinese)
-        .map((w) => ({
-          id: w.id,
-          chinese: w.chinese,
-          pinyin: w.pinyin || '',
-          khmer: w.khmer || '',
-          english: w.english || '',
-          className: w.classes?.name || w.classes?.date || '',
-          classId: w.class_id,
-          classDate: w.classes?.date || '',
-        }));
+        .map((w) => {
+          const cls = w.class_id ? classById.get(w.class_id) : undefined;
+          return {
+            id: w.id,
+            chinese: w.chinese,
+            pinyin: w.pinyin || '',
+            khmer: w.khmer || '',
+            english: w.english || '',
+            className: cls?.name || 'Outside Words',
+            classId: w.class_id || 'unassigned',
+            classDate: cls?.date || '',
+            lessonKey: classifyWordLesson(w.chinese),
+          };
+        });
 
       const mappedSentences: LearningSentence[] = ((sentencesRes.data || []) as any[])
         .filter((s) => s.chinese_sentence || s.chinese)
-        .map((s) => ({
-          id: s.id,
-          chinese: s.chinese_sentence || s.chinese || '',
-          pinyin: s.pinyin || '',
-          khmer: s.khmer_translation || s.khmer || '',
-          english: s.english_translation || s.english || '',
-          classId: s.class_id,
-        }));
+        .map((s) => {
+          const cls = s.class_id ? classById.get(s.class_id) : undefined;
+          const text = s.chinese_sentence || s.chinese || '';
+          return {
+            id: s.id,
+            chinese: text,
+            pinyin: s.pinyin || '',
+            khmer: s.khmer_translation || s.khmer || '',
+            english: s.english_translation || s.english || '',
+            className: cls?.name || 'Outside Words',
+            classId: s.class_id || 'unassigned',
+            classDate: cls?.date || '',
+            lessonKey: classifySentenceLesson(text, cls?.lesson_number ?? null),
+          };
+        });
 
-      setWords(mappedWords);
-      setSentences(mappedSentences);
-      setCurrentWordIndex(0);
-      setCurrentSentenceIndex(0);
-      sentencePlayedRef.current = false;
-      resetWordState();
+      setClassRows(fetchedClasses);
+      setAllWords(mappedWords);
+      setAllSentences(mappedSentences);
 
-      if (pendingStepRef.current === 'preview') {
-        setStep('preview');
-      } else if (mappedWords.length > 0) {
-        setStep('teach-words');
-      } else if (mappedSentences.length > 0) {
-        setStep('show-sentences');
-      } else {
-        setStep('preview');
+      const initClasses: Record<string, boolean> = {};
+      const initLessons: Record<string, boolean> = {};
+      fetchedClasses.forEach((c) => {
+        const name = c.name || 'Unnamed Class';
+        initClasses[name] = true;
+      });
+      if (mappedWords.some((w) => w.classId === 'unassigned') || mappedSentences.some((s) => s.classId === 'unassigned')) {
+        initClasses['Outside Words'] = true;
       }
-      setContentLoading(false);
+      Object.keys(initClasses).forEach((clsName) => {
+        LESSON_ORDER.forEach((lessonKey) => {
+          initLessons[`${clsName}::${lessonKey}`] = true;
+        });
+      });
+
+      setExpandedClasses(initClasses);
+      setExpandedLessons(initLessons);
+      setLoading(false);
     };
 
-    loadContent();
-  }, [selectedClass]);
+    loadLearningData();
+  }, []);
+
+  const groupedClasses = useMemo<ClassTaskGroup[]>(() => {
+    const classInfoById = new Map<string, ClassRow>();
+    classRows.forEach((c) => classInfoById.set(c.id, c));
+
+    const classNamesSet = new Set<string>();
+    classRows.forEach((c) => classNamesSet.add(c.name || 'Unnamed Class'));
+    allWords.forEach((w) => classNamesSet.add(w.className));
+    allSentences.forEach((s) => classNamesSet.add(s.className));
+
+    const groups: ClassTaskGroup[] = [];
+
+    classNamesSet.forEach((className) => {
+      const classWords = allWords.filter((w) => w.className === className);
+      const classSentences = allSentences.filter((s) => s.className === className);
+      if (classWords.length === 0 && classSentences.length === 0) return;
+
+      const dateIds = new Set<string>();
+      classWords.forEach((w) => dateIds.add(w.classId));
+      classSentences.forEach((s) => dateIds.add(s.classId));
+
+      const lessons: LessonTaskGroup[] = LESSON_ORDER.map((lessonKey) => {
+        const lessonWords = classWords.filter((w) => w.lessonKey === lessonKey);
+        const lessonSentences = classSentences.filter((s) => s.lessonKey === lessonKey);
+
+        const lessonDateMap = new Map<string, LessonDateSubtask>();
+        lessonWords.forEach((w) => {
+          if (!lessonDateMap.has(w.classId)) {
+            const cls = classInfoById.get(w.classId);
+            lessonDateMap.set(w.classId, {
+              classId: w.classId,
+              date: cls?.date || w.classDate || '',
+              lessonNumber: cls?.lesson_number ?? null,
+              description: cls?.description ?? null,
+              words: [],
+              sentences: [],
+            });
+          }
+          lessonDateMap.get(w.classId)!.words.push(w);
+        });
+
+        lessonSentences.forEach((s) => {
+          if (!lessonDateMap.has(s.classId)) {
+            const cls = classInfoById.get(s.classId);
+            lessonDateMap.set(s.classId, {
+              classId: s.classId,
+              date: cls?.date || s.classDate || '',
+              lessonNumber: cls?.lesson_number ?? null,
+              description: cls?.description ?? null,
+              words: [],
+              sentences: [],
+            });
+          }
+          lessonDateMap.get(s.classId)!.sentences.push(s);
+        });
+
+        const sortedDates = Array.from(lessonDateMap.values()).sort((a, b) => {
+          const timeA = a.date ? new Date(a.date).getTime() : 0;
+          const timeB = b.date ? new Date(b.date).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        return {
+          lessonKey,
+          words: lessonWords,
+          sentences: lessonSentences,
+          dates: sortedDates,
+        };
+      }).filter((lesson) => {
+        if (lesson.lessonKey === 'Outside Words') {
+          return lesson.words.length > 0 || lesson.sentences.length > 0;
+        }
+        return true;
+      });
+
+      groups.push({
+        className,
+        lessons,
+        totalWords: classWords.length,
+        totalSentences: classSentences.length,
+        totalDates: dateIds.size,
+      });
+    });
+
+    return groups;
+  }, [classRows, allWords, allSentences]);
 
   const resetWordState = () => {
     setWordPlayed(false);
@@ -536,16 +590,44 @@ export default function LearningPage() {
     }
   };
 
-  const toggleLesson = (lessonName: string) => {
-    setExpandedLessons((prev) => ({
+  const toggleClassGroup = (className: string) => {
+    setExpandedClasses((prev) => ({
       ...prev,
-      [lessonName]: !(prev[lessonName] ?? true),
+      [className]: !(prev[className] ?? true),
     }));
   };
 
-  const openClassDate = (cls: ClassOption, mode: 'preview' | 'learn') => {
-    pendingStepRef.current = mode;
-    setSelectedClass(cls);
+  const toggleLesson = (className: string, lessonKey: string) => {
+    const key = `${className}::${lessonKey}`;
+    setExpandedLessons((prev) => ({
+      ...prev,
+      [key]: !(prev[key] ?? true),
+    }));
+  };
+
+  const openSession = (
+    title: string,
+    subtitle: string,
+    sessionWords: LearningWord[],
+    sessionSentences: LearningSentence[],
+    mode: 'preview' | 'learn'
+  ) => {
+    if (sessionWords.length === 0 && sessionSentences.length === 0) return;
+    setActiveSession({ title, subtitle });
+    setWords(sessionWords);
+    setSentences(sessionSentences);
+    setCurrentWordIndex(0);
+    setCurrentSentenceIndex(0);
+    sentencePlayedRef.current = false;
+    resetWordState();
+
+    if (mode === 'preview') {
+      setStep('preview');
+    } else if (sessionWords.length > 0) {
+      setStep('teach-words');
+    } else {
+      setStep('show-sentences');
+    }
   };
 
   const formatDateLabel = (dateStr?: string | null) => {
@@ -559,18 +641,18 @@ export default function LearningPage() {
     });
   };
 
-  if (loading || contentLoading) {
+  if (loading) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-4 py-2 text-sm text-slate-500">
           <svg className="animate-spin h-5 w-5 text-[#b91c1c]" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round"/></svg>
-          {contentLoading ? 'Loading words & sentences...' : 'Loading lessons...'}
+          Loading lessons...
         </div>
       </div>
     );
   }
 
-  if (classes.length === 0) {
+  if (groupedClasses.length === 0) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-stone-300 p-10 text-center text-slate-500">
         <Sparkles className="mx-auto text-slate-300" size={48} />
@@ -585,48 +667,50 @@ export default function LearningPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Learn</p>
-          <h1 className="mt-1 text-3xl font-bold">Choose a lesson & date to start learning</h1>
-          <p className="mt-1 text-sm text-slate-500">Select a date under a lesson to preview words &amp; sentences or start practicing.</p>
+          <h1 className="mt-1 text-3xl font-bold">Choose a class &amp; lesson to start learning</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Organized by Class → Lesson (Lesson 1, Lesson 2, Lesson 3, Outside Words) → Date.
+          </p>
         </div>
 
-        <div className="space-y-4">
-          {groupedLessons.map((lesson) => {
-            const isExpanded = expandedLessons[lesson.name] ?? true;
+        <div className="space-y-5">
+          {groupedClasses.map((classGroup) => {
+            const isClassExpanded = expandedClasses[classGroup.className] ?? true;
             return (
               <section
-                key={lesson.name}
+                key={classGroup.className}
                 className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
               >
-                {/* Parent Task: Lesson */}
+                {/* Level 1: Parent Class */}
                 <button
                   type="button"
-                  onClick={() => toggleLesson(lesson.name)}
-                  className="flex w-full items-center justify-between gap-4 bg-stone-50/80 px-5 py-4 text-left transition hover:bg-stone-100/80"
+                  onClick={() => toggleClassGroup(classGroup.className)}
+                  className="flex w-full items-center justify-between gap-4 bg-stone-50 px-5 py-4 text-left transition hover:bg-stone-100/80"
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-[#b91c1c] text-white shadow-sm">
-                      <BookOpen size={19} />
+                      <GraduationCap size={20} />
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#b91c1c]">
-                          Lesson
+                          Class
                         </span>
                         <span className="text-xs font-medium text-slate-500">
-                          {lesson.dates.length} date{lesson.dates.length !== 1 ? 's' : ''}
+                          {classGroup.lessons.length} lesson{classGroup.lessons.length !== 1 ? 's' : ''} · {classGroup.totalDates} date{classGroup.totalDates !== 1 ? 's' : ''}
                         </span>
                       </div>
                       <h2 className="mt-1 text-lg sm:text-xl font-bold text-slate-900 truncate">
-                        {lesson.name}
+                        {classGroup.className}
                       </h2>
                       <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-600">
                         <span className="inline-flex items-center gap-1">
                           <span className="grid size-4 place-items-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">词</span>
-                          {lesson.totalWords} word{lesson.totalWords !== 1 ? 's' : ''}
+                          {classGroup.totalWords} word{classGroup.totalWords !== 1 ? 's' : ''}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <span className="grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">句</span>
-                          {lesson.totalSentences} sentence{lesson.totalSentences !== 1 ? 's' : ''}
+                          {classGroup.totalSentences} sentence{classGroup.totalSentences !== 1 ? 's' : ''}
                         </span>
                       </div>
                     </div>
@@ -634,80 +718,204 @@ export default function LearningPage() {
                   <ChevronDown
                     size={20}
                     className={`shrink-0 text-slate-400 transition-transform duration-200 ${
-                      isExpanded ? 'rotate-180' : ''
+                      isClassExpanded ? 'rotate-180' : ''
                     }`}
                   />
                 </button>
 
-                {/* Subtasks: Dates under Lesson */}
-                {isExpanded && (
-                  <div className="border-t border-stone-200 bg-white px-4 py-3 sm:px-5">
-                    <div className="relative space-y-2.5 border-l-2 border-stone-200 pl-4 sm:pl-5">
-                      {lesson.dates.map((dateItem) => (
+                {/* Level 2: Lessons under Class */}
+                {isClassExpanded && (
+                  <div className="border-t border-stone-200 bg-white px-4 py-4 sm:px-5 space-y-3">
+                    {classGroup.lessons.map((lesson) => {
+                      const lessonExpandKey = `${classGroup.className}::${lesson.lessonKey}`;
+                      const isLessonExpanded = expandedLessons[lessonExpandKey] ?? true;
+                      const isOutside = lesson.lessonKey === 'Outside Words';
+                      const hasItems = lesson.words.length > 0 || lesson.sentences.length > 0;
+
+                      return (
                         <div
-                          key={dateItem.id}
-                          className="relative flex flex-col gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 transition hover:border-red-200 hover:bg-white sm:flex-row sm:items-center sm:justify-between"
+                          key={lesson.lessonKey}
+                          className="overflow-hidden rounded-xl border border-stone-200 bg-stone-50/40"
                         >
-                          {/* Connector dot to Lesson parent */}
-                          <span
-                            aria-hidden="true"
-                            className="absolute -left-[22px] sm:-left-[26px] top-6 h-0.5 w-3.5 sm:w-4 bg-stone-200"
-                          />
-                          <div
-                            onClick={() => openClassDate(dateItem, 'learn')}
-                            className="flex flex-1 cursor-pointer items-start gap-3 min-w-0"
-                          >
-                            <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-white border border-stone-200 text-[#b91c1c] shadow-xs">
-                              <Calendar size={17} />
-                            </span>
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm sm:text-base font-bold text-slate-900">
-                                  {formatDateLabel(dateItem.date)}
-                                </p>
-                                {dateItem.lessonNumber !== null && (
-                                  <span className="rounded-full bg-stone-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                                    Lesson #{dateItem.lessonNumber}
+                          <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                            <button
+                              type="button"
+                              onClick={() => toggleLesson(classGroup.className, lesson.lessonKey)}
+                              className="flex flex-1 items-start gap-3 text-left min-w-0"
+                            >
+                              <span
+                                className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border shadow-xs ${
+                                  isOutside
+                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                    : 'border-red-100 bg-white text-[#b91c1c]'
+                                }`}
+                              >
+                                {isOutside ? <Layers size={17} /> : <BookOpen size={17} />}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="text-base font-bold text-slate-900">
+                                    {lesson.lessonKey}
+                                  </h3>
+                                  {isOutside && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                                      Extra Vocabulary
+                                    </span>
+                                  )}
+                                  {lesson.dates.length > 0 && (
+                                    <span className="text-xs text-slate-500">
+                                      · {lesson.dates.length} date{lesson.dates.length !== 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="grid size-4 place-items-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">词</span>
+                                    {lesson.words.length} word{lesson.words.length !== 1 ? 's' : ''}
                                   </span>
-                                )}
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">句</span>
+                                    {lesson.sentences.length} sentence{lesson.sentences.length !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
                               </div>
-                              {dateItem.description && (
-                                <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">
-                                  {dateItem.description}
-                                </p>
+                            </button>
+
+                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                              {hasItems ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openSession(
+                                        `${classGroup.className} · ${lesson.lessonKey}`,
+                                        'All dates in this lesson',
+                                        lesson.words,
+                                        lesson.sentences,
+                                        'preview'
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-stone-300 hover:bg-stone-50"
+                                  >
+                                    <Eye size={14} /> Preview
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      openSession(
+                                        `${classGroup.className} · ${lesson.lessonKey}`,
+                                        'All dates in this lesson',
+                                        lesson.words,
+                                        lesson.sentences,
+                                        'learn'
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#b91c1c] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#991b1b]"
+                                  >
+                                    <Play size={13} className="fill-current" /> Learn
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-xs italic text-slate-400">No words yet</span>
                               )}
-                              <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                                <span className="inline-flex items-center gap-1">
-                                  <span className="grid size-4 place-items-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">词</span>
-                                  {dateItem.wordCount} word{dateItem.wordCount !== 1 ? 's' : ''}
-                                </span>
-                                <span className="inline-flex items-center gap-1">
-                                  <span className="grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">句</span>
-                                  {dateItem.sentenceCount} sentence{dateItem.sentenceCount !== 1 ? 's' : ''}
-                                </span>
-                              </div>
+                              {lesson.dates.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleLesson(classGroup.className, lesson.lessonKey)}
+                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-stone-200/60 hover:text-slate-600"
+                                  aria-label={`Toggle ${lesson.lessonKey} dates`}
+                                >
+                                  <ChevronDown
+                                    size={17}
+                                    className={`transition-transform duration-200 ${
+                                      isLessonExpanded ? 'rotate-180' : ''
+                                    }`}
+                                  />
+                                </button>
+                              )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                            <button
-                              type="button"
-                              onClick={() => openClassDate(dateItem, 'preview')}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-stone-300 hover:bg-stone-50"
-                            >
-                              <Eye size={14} /> Preview
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openClassDate(dateItem, 'learn')}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#b91c1c] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#991b1b]"
-                            >
-                              <Play size={13} className="fill-current" /> Learn
-                            </button>
-                          </div>
+                          {/* Level 3: Date Subtasks under Lesson */}
+                          {isLessonExpanded && lesson.dates.length > 0 && (
+                            <div className="border-t border-stone-200/80 bg-white px-4 py-3">
+                              <div className="relative space-y-2 border-l-2 border-stone-200 pl-4">
+                                {lesson.dates.map((dateItem) => (
+                                  <div
+                                    key={`${lesson.lessonKey}-${dateItem.classId}`}
+                                    className="relative flex flex-col gap-2.5 rounded-xl border border-stone-200 bg-stone-50/50 p-3 transition hover:border-red-200 hover:bg-white sm:flex-row sm:items-center sm:justify-between"
+                                  >
+                                    <span
+                                      aria-hidden="true"
+                                      className="absolute -left-[18px] top-5 h-0.5 w-3.5 bg-stone-200"
+                                    />
+                                    <div
+                                      onClick={() =>
+                                        openSession(
+                                          `${classGroup.className} · ${lesson.lessonKey}`,
+                                          formatDateLabel(dateItem.date),
+                                          dateItem.words,
+                                          dateItem.sentences,
+                                          'learn'
+                                        )
+                                      }
+                                      className="flex flex-1 cursor-pointer items-center gap-3 min-w-0"
+                                    >
+                                      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white border border-stone-200 text-[#b91c1c]">
+                                        <Calendar size={15} />
+                                      </span>
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-bold text-slate-900">
+                                          {formatDateLabel(dateItem.date)}
+                                        </p>
+                                        <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                                          <span>{dateItem.words.length} word{dateItem.words.length !== 1 ? 's' : ''}</span>
+                                          <span>·</span>
+                                          <span>{dateItem.sentences.length} sentence{dateItem.sentences.length !== 1 ? 's' : ''}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openSession(
+                                            `${classGroup.className} · ${lesson.lessonKey}`,
+                                            formatDateLabel(dateItem.date),
+                                            dateItem.words,
+                                            dateItem.sentences,
+                                            'preview'
+                                          )
+                                        }
+                                        className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-stone-50"
+                                      >
+                                        <Eye size={13} /> Preview
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openSession(
+                                            `${classGroup.className} · ${lesson.lessonKey}`,
+                                            formatDateLabel(dateItem.date),
+                                            dateItem.words,
+                                            dateItem.sentences,
+                                            'learn'
+                                          )
+                                        }
+                                        className="inline-flex items-center gap-1 rounded-lg bg-[#b91c1c] px-3 py-1 text-xs font-semibold text-white hover:bg-[#991b1b]"
+                                      >
+                                        <Play size={12} className="fill-current" /> Learn
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
                 )}
               </section>
@@ -718,7 +926,7 @@ export default function LearningPage() {
     );
   }
 
-  if (step === 'preview' && selectedClass) {
+  if (step === 'preview' && activeSession) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -727,14 +935,14 @@ export default function LearningPage() {
               type="button"
               onClick={() => {
                 setStep('select-date');
-                setSelectedClass(null);
+                setActiveSession(null);
               }}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#b91c1c]"
             >
               <ArrowLeft size={16} /> Back to Lessons
             </button>
             <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
-              {selectedClass.name} · {formatDateLabel(selectedClass.date)}
+              {activeSession.title} · {activeSession.subtitle}
             </p>
             <h1 className="mt-1 text-2xl sm:text-3xl font-bold">Preview Words &amp; Sentences</h1>
           </div>
@@ -764,7 +972,7 @@ export default function LearningPage() {
             </h2>
           </div>
           {words.length === 0 ? (
-            <p className="text-sm text-slate-500">No words for this date yet.</p>
+            <p className="text-sm text-slate-500">No words in this selection yet.</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {words.map((w, idx) => (
@@ -804,7 +1012,7 @@ export default function LearningPage() {
             </h2>
           </div>
           {sentences.length === 0 ? (
-            <p className="text-sm text-slate-500">No sentences for this date yet.</p>
+            <p className="text-sm text-slate-500">No sentences in this selection yet.</p>
           ) : (
             <div className="space-y-3">
               {sentences.map((s, idx) => (
@@ -848,7 +1056,7 @@ export default function LearningPage() {
                 type="button"
                 onClick={() => {
                   setStep('select-date');
-                  setSelectedClass(null);
+                  setActiveSession(null);
                 }}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
               >
@@ -863,7 +1071,7 @@ export default function LearningPage() {
               </button>
             </div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
-              {selectedClass?.name} {selectedClass?.date ? `· ${formatDateLabel(selectedClass.date)}` : ''}
+              {activeSession?.title} {activeSession?.subtitle ? `· ${activeSession.subtitle}` : ''}
             </p>
             <h1 className="mt-1 text-2xl font-bold">Learn Words</h1>
           </div>
@@ -921,7 +1129,7 @@ export default function LearningPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{selectedClass?.name}</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{activeSession?.title}</p>
             <h1 className="mt-1 text-2xl font-bold">Practice Writing</h1>
           </div>
           <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
@@ -1061,7 +1269,7 @@ export default function LearningPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{selectedClass?.name}</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{activeSession?.title}</p>
             <h1 className="mt-1 text-2xl font-bold">Speak the Word</h1>
           </div>
           <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
@@ -1199,7 +1407,7 @@ export default function LearningPage() {
                 type="button"
                 onClick={() => {
                   setStep('select-date');
-                  setSelectedClass(null);
+                  setActiveSession(null);
                 }}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
               >
@@ -1214,7 +1422,7 @@ export default function LearningPage() {
               </button>
             </div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
-              {selectedClass?.name} {selectedClass?.date ? `· ${formatDateLabel(selectedClass.date)}` : ''}
+              {activeSession?.title} {activeSession?.subtitle ? `· ${activeSession.subtitle}` : ''}
             </p>
             <h1 className="mt-1 text-2xl font-bold">Sentences</h1>
           </div>
@@ -1277,7 +1485,7 @@ export default function LearningPage() {
         <div className="rounded-3xl border border-stone-200 bg-white p-10 shadow-sm">
           <Sparkles className="mx-auto text-amber-500" size={48} />
           <p className="mt-4 text-sm font-semibold tracking-wider text-[#b91c1c]">LEARNING COMPLETE</p>
-          <h1 className="mt-2 text-3xl font-bold">Great job! You finished {selectedClass?.name}</h1>
+          <h1 className="mt-2 text-3xl font-bold">Great job! You finished {activeSession?.title}</h1>
           <p className="mt-4 text-slate-600">
             You learned {words.length} word{words.length !== 1 ? 's' : ''} and {sentences.length} sentence{sentences.length !== 1 ? 's' : ''}.
           </p>
@@ -1286,7 +1494,7 @@ export default function LearningPage() {
           <button
             onClick={() => {
               setStep('select-date');
-              setSelectedClass(null);
+              setActiveSession(null);
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
           >
