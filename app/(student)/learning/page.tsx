@@ -77,13 +77,13 @@ type ActiveSession = {
 type LearningStep = 'select-date' | 'preview' | 'teach-words' | 'practice-writing' | 'speak-word' | 'show-sentences' | 'complete';
 
 const UNIFIED_LESSON_THEME = {
-  card: 'border-sky-200/80 bg-sky-50/70',
-  header: 'bg-sky-50/90',
-  icon: 'border-sky-200 bg-sky-100 text-sky-700',
-  badge: 'bg-sky-100 text-sky-800',
-  subtaskContainer: 'border-t border-slate-200/80 bg-slate-50/90 px-4 py-3',
+  card: 'border-sky-300/80 bg-sky-100',
+  header: 'bg-sky-100',
+  icon: 'border-sky-300 bg-white text-sky-700',
+  badge: 'bg-sky-200/80 text-sky-900',
+  subtaskContainer: 'border-t border-sky-200 bg-slate-100 px-4 py-3',
   connector: 'border-slate-300',
-  subtaskCard: 'border-slate-200/90 bg-slate-100/90 hover:border-slate-300 hover:bg-slate-100',
+  subtaskCard: 'border-slate-300/80 bg-slate-200/70 hover:border-slate-400/70 hover:bg-slate-200',
 };
 
 type SpeechRecognitionInstance = {
