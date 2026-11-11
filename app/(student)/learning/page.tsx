@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Volume2, ChevronRight, Check, X, Sparkles, RotateCcw, Mic, MicOff, ArrowLeft } from 'lucide-react';
+import { Volume2, ChevronRight, ChevronDown, Check, X, Sparkles, RotateCcw, Mic, MicOff, ArrowLeft, BookOpen, Calendar, Eye, Play } from 'lucide-react';
 import HanziWriter from 'hanzi-writer';
 import { speakChinese as speak } from '@/lib/speech';
 
@@ -30,11 +30,20 @@ type ClassOption = {
   id: string;
   name: string;
   date: string;
+  lessonNumber: number | null;
+  description: string | null;
   wordCount: number;
   sentenceCount: number;
 };
 
-type LearningStep = 'select-date' | 'teach-words' | 'practice-writing' | 'speak-word' | 'show-sentences' | 'complete';
+type LessonGroup = {
+  name: string;
+  dates: ClassOption[];
+  totalWords: number;
+  totalSentences: number;
+};
+
+type LearningStep = 'select-date' | 'preview' | 'teach-words' | 'practice-writing' | 'speak-word' | 'show-sentences' | 'complete';
 
 type SpeechRecognitionInstance = {
   lang: string;
@@ -50,6 +59,9 @@ type SpeechRecognitionInstance = {
 export default function LearningPage() {
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClass, setSelectedClass] = useState<ClassOption | null>(null);
+  const [expandedLessons, setExpandedLessons] = useState<Record<string, boolean>>({});
+  const [contentLoading, setContentLoading] = useState(false);
+  const pendingStepRef = useRef<'preview' | 'learn'>('learn');
   const [words, setWords] = useState<LearningWord[]>([]);
   const [sentences, setSentences] = useState<LearningSentence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +77,7 @@ export default function LearningPage() {
   const speechRecognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const isHoldingRef = useRef(false);
   const audioPlayedRef = useRef(false);
+  const sentencePlayedRef = useRef(false);
 
   // Writing practice state
   const writerElementRef = useRef<HTMLDivElement>(null);
@@ -93,7 +106,7 @@ export default function LearningPage() {
 
       const { data: classData } = await supabase
         .from('classes')
-        .select('id, name, date')
+        .select('id, name, date, lesson_number, description')
         .order('date', { ascending: false });
 
       if (!classData || classData.length === 0) {
@@ -101,7 +114,13 @@ export default function LearningPage() {
         return;
       }
 
-      type ClassRow = { id: string; name: string | null; date: string | null };
+      type ClassRow = {
+        id: string;
+        name: string | null;
+        date: string | null;
+        lesson_number?: number | null;
+        description?: string | null;
+      };
 
       const classesWithCounts = await Promise.all(
         (classData as ClassRow[]).map(async (c) => {
@@ -111,27 +130,64 @@ export default function LearningPage() {
           ]);
           return {
             id: c.id,
-            name: c.name || '',
+            name: c.name || 'Unnamed Lesson',
             date: c.date || '',
+            lessonNumber: c.lesson_number ?? null,
+            description: c.description ?? null,
             wordCount: wordsRes.count || 0,
             sentenceCount: sentencesRes.count || 0,
           };
         })
       );
 
-      setClasses(classesWithCounts.filter(c => c.wordCount > 0));
+      const activeClasses = classesWithCounts.filter(c => c.wordCount > 0 || c.sentenceCount > 0);
+      setClasses(activeClasses);
+
+      const initialExpanded: Record<string, boolean> = {};
+      activeClasses.forEach((c) => {
+        const key = c.name || 'Unnamed Lesson';
+        initialExpanded[key] = true;
+      });
+      setExpandedLessons(initialExpanded);
       setLoading(false);
     };
 
     loadClasses();
   }, []);
 
+  const groupedLessons = useMemo<LessonGroup[]>(() => {
+    const map = new Map<string, ClassOption[]>();
+    classes.forEach((cls) => {
+      const key = cls.name || 'Unnamed Lesson';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(cls);
+    });
+
+    return Array.from(map.entries()).map(([name, dates]) => {
+      const sortedDates = [...dates].sort((a, b) => {
+        const timeA = a.date ? new Date(a.date).getTime() : 0;
+        const timeB = b.date ? new Date(b.date).getTime() : 0;
+        return timeB - timeA;
+      });
+      return {
+        name,
+        dates: sortedDates,
+        totalWords: sortedDates.reduce((sum, d) => sum + d.wordCount, 0),
+        totalSentences: sortedDates.reduce((sum, d) => sum + d.sentenceCount, 0),
+      };
+    });
+  }, [classes]);
+
   useEffect(() => {
     if (!selectedClass || !supabase) return;
 
     const loadContent = async () => {
+      setContentLoading(true);
       const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) return;
+      if (!auth.user) {
+        setContentLoading(false);
+        return;
+      }
 
       const [wordsRes, sentencesRes] = await Promise.all([
         supabase
@@ -174,8 +230,19 @@ export default function LearningPage() {
       setSentences(mappedSentences);
       setCurrentWordIndex(0);
       setCurrentSentenceIndex(0);
-      setStep('teach-words');
+      sentencePlayedRef.current = false;
       resetWordState();
+
+      if (pendingStepRef.current === 'preview') {
+        setStep('preview');
+      } else if (mappedWords.length > 0) {
+        setStep('teach-words');
+      } else if (mappedSentences.length > 0) {
+        setStep('show-sentences');
+      } else {
+        setStep('preview');
+      }
+      setContentLoading(false);
     };
 
     loadContent();
@@ -318,6 +385,13 @@ export default function LearningPage() {
   }, [step, currentWord, wordPlayed]);
 
   useEffect(() => {
+    if (step === 'show-sentences' && currentSentence && !sentencePlayedRef.current) {
+      sentencePlayedRef.current = true;
+      speak(currentSentence.chinese);
+    }
+  }, [step, currentSentence]);
+
+  useEffect(() => {
     return () => {
       if (speechRecognitionRef.current) {
         try {
@@ -456,12 +530,41 @@ export default function LearningPage() {
     }
   };
 
-  if (loading) {
+  const replaySentence = () => {
+    if (currentSentence) {
+      speak(currentSentence.chinese);
+    }
+  };
+
+  const toggleLesson = (lessonName: string) => {
+    setExpandedLessons((prev) => ({
+      ...prev,
+      [lessonName]: !(prev[lessonName] ?? true),
+    }));
+  };
+
+  const openClassDate = (cls: ClassOption, mode: 'preview' | 'learn') => {
+    pendingStepRef.current = mode;
+    setSelectedClass(cls);
+  };
+
+  const formatDateLabel = (dateStr?: string | null) => {
+    if (!dateStr) return 'No date';
+    const parsed = new Date(dateStr);
+    if (Number.isNaN(parsed.getTime())) return dateStr;
+    return parsed.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  if (loading || contentLoading) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-4 py-2 text-sm text-slate-500">
           <svg className="animate-spin h-5 w-5 text-[#b91c1c]" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="4" fill="none" strokeLinecap="round"/></svg>
-          Loading classes...
+          {contentLoading ? 'Loading words & sentences...' : 'Loading lessons...'}
         </div>
       </div>
     );
@@ -482,30 +585,255 @@ export default function LearningPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">Learn</p>
-          <h1 className="mt-1 text-3xl font-bold">Choose a class to start learning</h1>
+          <h1 className="mt-1 text-3xl font-bold">Choose a lesson & date to start learning</h1>
+          <p className="mt-1 text-sm text-slate-500">Select a date under a lesson to preview words &amp; sentences or start practicing.</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {classes.map((c) => (
+
+        <div className="space-y-4">
+          {groupedLessons.map((lesson) => {
+            const isExpanded = expandedLessons[lesson.name] ?? true;
+            return (
+              <section
+                key={lesson.name}
+                className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"
+              >
+                {/* Parent Task: Lesson */}
+                <button
+                  type="button"
+                  onClick={() => toggleLesson(lesson.name)}
+                  className="flex w-full items-center justify-between gap-4 bg-stone-50/80 px-5 py-4 text-left transition hover:bg-stone-100/80"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-[#b91c1c] text-white shadow-sm">
+                      <BookOpen size={19} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#b91c1c]">
+                          Lesson
+                        </span>
+                        <span className="text-xs font-medium text-slate-500">
+                          {lesson.dates.length} date{lesson.dates.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <h2 className="mt-1 text-lg sm:text-xl font-bold text-slate-900 truncate">
+                        {lesson.name}
+                      </h2>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="grid size-4 place-items-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">词</span>
+                          {lesson.totalWords} word{lesson.totalWords !== 1 ? 's' : ''}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">句</span>
+                          {lesson.totalSentences} sentence{lesson.totalSentences !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronDown
+                    size={20}
+                    className={`shrink-0 text-slate-400 transition-transform duration-200 ${
+                      isExpanded ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* Subtasks: Dates under Lesson */}
+                {isExpanded && (
+                  <div className="border-t border-stone-200 bg-white px-4 py-3 sm:px-5">
+                    <div className="relative space-y-2.5 border-l-2 border-stone-200 pl-4 sm:pl-5">
+                      {lesson.dates.map((dateItem) => (
+                        <div
+                          key={dateItem.id}
+                          className="relative flex flex-col gap-3 rounded-xl border border-stone-200 bg-stone-50/50 p-3.5 transition hover:border-red-200 hover:bg-white sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          {/* Connector dot to Lesson parent */}
+                          <span
+                            aria-hidden="true"
+                            className="absolute -left-[22px] sm:-left-[26px] top-6 h-0.5 w-3.5 sm:w-4 bg-stone-200"
+                          />
+                          <div
+                            onClick={() => openClassDate(dateItem, 'learn')}
+                            className="flex flex-1 cursor-pointer items-start gap-3 min-w-0"
+                          >
+                            <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-white border border-stone-200 text-[#b91c1c] shadow-xs">
+                              <Calendar size={17} />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm sm:text-base font-bold text-slate-900">
+                                  {formatDateLabel(dateItem.date)}
+                                </p>
+                                {dateItem.lessonNumber !== null && (
+                                  <span className="rounded-full bg-stone-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                    Lesson #{dateItem.lessonNumber}
+                                  </span>
+                                )}
+                              </div>
+                              {dateItem.description && (
+                                <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">
+                                  {dateItem.description}
+                                </p>
+                              )}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="grid size-4 place-items-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">词</span>
+                                  {dateItem.wordCount} word{dateItem.wordCount !== 1 ? 's' : ''}
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="grid size-4 place-items-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">句</span>
+                                  {dateItem.sentenceCount} sentence{dateItem.sentenceCount !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <button
+                              type="button"
+                              onClick={() => openClassDate(dateItem, 'preview')}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-stone-300 hover:bg-stone-50"
+                            >
+                              <Eye size={14} /> Preview
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openClassDate(dateItem, 'learn')}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#b91c1c] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#991b1b]"
+                            >
+                              <Play size={13} className="fill-current" /> Learn
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'preview' && selectedClass) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
             <button
-              key={c.id}
-              onClick={() => setSelectedClass(c)}
-              className="relative rounded-2xl border border-stone-200 bg-white p-6 transition hover:border-red-200 hover:shadow-md"
+              type="button"
+              onClick={() => {
+                setStep('select-date');
+                setSelectedClass(null);
+              }}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-[#b91c1c]"
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-500">{c.date ? new Date(c.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No date'}</p>
-                  <h3 className="mt-1 text-xl font-bold">{c.name}</h3>
-                </div>
-                <ChevronRight className="text-slate-400" size={24} />
-              </div>
-              <div className="mt-4 flex items-center gap-4 text-sm text-slate-500">
-                <span className="flex items-center gap-1"><span className="grid size-5 place-items-center rounded-full bg-red-100 text-red-600">词</span>{c.wordCount} words</span>
-                <span className="flex items-center gap-1"><span className="grid size-5 place-items-center rounded-full bg-blue-100 text-blue-600">句</span>{c.sentenceCount} sentences</span>
-              </div>
-              <div className="absolute inset-0 rounded-2xl ring-2 ring-transparent transition hover:ring-[#b91c1c]/20" />
+              <ArrowLeft size={16} /> Back to Lessons
             </button>
-          ))}
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
+              {selectedClass.name} · {formatDateLabel(selectedClass.date)}
+            </p>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold">Preview Words &amp; Sentences</h1>
+          </div>
+          {(words.length > 0 || sentences.length > 0) && (
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentWordIndex(0);
+                setCurrentSentenceIndex(0);
+                sentencePlayedRef.current = false;
+                resetWordState();
+                setStep(words.length > 0 ? 'teach-words' : 'show-sentences');
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#991b1b]"
+            >
+              <Play size={15} className="fill-current" /> Start Practice
+            </button>
+          )}
         </div>
+
+        {/* Words Preview */}
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+              <span className="grid size-6 place-items-center rounded-full bg-red-100 text-xs font-bold text-red-600">词</span>
+              Words ({words.length})
+            </h2>
+          </div>
+          {words.length === 0 ? (
+            <p className="text-sm text-slate-500">No words for this date yet.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {words.map((w, idx) => (
+                <div
+                  key={w.id}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50/70 p-3.5"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xs font-semibold text-slate-400">{idx + 1}.</span>
+                      <span className="text-2xl font-bold text-slate-900">{w.chinese}</span>
+                      {w.pinyin && <span className="text-sm font-medium text-[#b91c1c]">{w.pinyin}</span>}
+                    </div>
+                    {w.khmer && <p className="mt-1 text-sm text-slate-700">{w.khmer}</p>}
+                    {w.english && <p className="text-xs text-slate-500">{w.english}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => speak(w.chinese)}
+                    className="grid size-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-[#b91c1c]"
+                    aria-label={`Listen to ${w.chinese}`}
+                  >
+                    <Volume2 size={17} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Sentences Preview */}
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+              <span className="grid size-6 place-items-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">句</span>
+              Sentences ({sentences.length})
+            </h2>
+          </div>
+          {sentences.length === 0 ? (
+            <p className="text-sm text-slate-500">No sentences for this date yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {sentences.map((s, idx) => (
+                <div
+                  key={s.id}
+                  className="flex items-start justify-between gap-3 rounded-xl border border-stone-100 bg-stone-50/70 p-4"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xs font-semibold text-slate-400">{idx + 1}.</span>
+                      <p className="text-lg font-bold text-slate-900">{s.chinese}</p>
+                    </div>
+                    {s.pinyin && <p className="mt-1 text-sm font-medium text-blue-700">{s.pinyin}</p>}
+                    {s.khmer && <p className="mt-1 text-sm text-slate-700">{s.khmer}</p>}
+                    {s.english && <p className="text-xs text-slate-500">{s.english}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => speak(s.chinese)}
+                    className="grid size-9 shrink-0 place-items-center rounded-full border border-stone-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                    aria-label={`Listen to sentence ${idx + 1}`}
+                  >
+                    <Volume2 size={17} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     );
   }
@@ -513,12 +841,33 @@ export default function LearningPage() {
   if (step === 'teach-words' && currentWord) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{selectedClass?.name}</p>
+            <div className="flex flex-wrap items-center gap-3 mb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('select-date');
+                  setSelectedClass(null);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
+              >
+                <ArrowLeft size={14} /> Lessons
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('preview')}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
+              >
+                <Eye size={14} /> Preview All
+              </button>
+            </div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
+              {selectedClass?.name} {selectedClass?.date ? `· ${formatDateLabel(selectedClass.date)}` : ''}
+            </p>
             <h1 className="mt-1 text-2xl font-bold">Learn Words</h1>
           </div>
-          <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
+          <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold shrink-0">
             {currentWordIndex + 1} / {words.length}
           </span>
         </div>
@@ -841,29 +1190,35 @@ export default function LearningPage() {
   }
 
   if (step === 'show-sentences' && currentSentence) {
-    const sentencePlayedRef = useRef(false);
-    
-    useEffect(() => {
-      if (!sentencePlayedRef.current && currentSentence) {
-        sentencePlayedRef.current = true;
-        speak(currentSentence.chinese);
-      }
-    }, [currentSentence]);
-
-    const replaySentence = () => {
-      if (currentSentence) {
-        speak(currentSentence.chinese);
-      }
-    };
-
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">{selectedClass?.name}</p>
+            <div className="flex flex-wrap items-center gap-3 mb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('select-date');
+                  setSelectedClass(null);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
+              >
+                <ArrowLeft size={14} /> Lessons
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('preview')}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#b91c1c]"
+              >
+                <Eye size={14} /> Preview All
+              </button>
+            </div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#b91c1c]">
+              {selectedClass?.name} {selectedClass?.date ? `· ${formatDateLabel(selectedClass.date)}` : ''}
+            </p>
             <h1 className="mt-1 text-2xl font-bold">Sentences</h1>
           </div>
-          <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold">
+          <span className="rounded-full bg-stone-200 px-3 py-1.5 text-sm font-semibold shrink-0">
             {currentSentenceIndex + 1} / {sentences.length}
           </span>
         </div>
@@ -927,7 +1282,7 @@ export default function LearningPage() {
             You learned {words.length} word{words.length !== 1 ? 's' : ''} and {sentences.length} sentence{sentences.length !== 1 ? 's' : ''}.
           </p>
         </div>
-        <div className="flex justify-center gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <button
             onClick={() => {
               setStep('select-date');
@@ -935,19 +1290,26 @@ export default function LearningPage() {
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
           >
-            <RotateCcw size={17} /> Choose Another Class
+            <ArrowLeft size={17} /> Choose Another Lesson
+          </button>
+          <button
+            onClick={() => setStep('preview')}
+            className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
+          >
+            <Eye size={17} /> Preview Words &amp; Sentences
           </button>
           <button
             onClick={() => {
               setCurrentWordIndex(0);
               setCurrentSentenceIndex(0);
-              setStep('teach-words');
+              sentencePlayedRef.current = false;
               resetWordState();
               audioPlayedRef.current = false;
+              setStep(words.length > 0 ? 'teach-words' : 'show-sentences');
             }}
             className="inline-flex items-center gap-2 rounded-xl bg-[#b91c1c] px-5 py-3 text-sm font-semibold text-white"
           >
-            <RotateCcw size={17} /> Repeat This Class
+            <RotateCcw size={17} /> Repeat This Date
           </button>
         </div>
       </div>
